@@ -6,6 +6,20 @@
 {% block nav-breadcrumbs %}{% endblock %}
 {% block nav-sidebar %}{% endblock %}
 
+{% block extrastyle %}
+{{ block.super }}
+<style>
+/* Nqo Perfumes is a catalogue-management admin. Keep Django's
+   authentication and 2FA configuration out of the dashboard UI.
+   This is presentation-only; it does not disable authentication,
+   permissions, or 2FA in the application. */
+.dashboard #content-main #app_auth,
+.dashboard #content-main #app_django_admin_2fa_plus {
+    display: none !important;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div id="content-main" class="app-list">
   {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
