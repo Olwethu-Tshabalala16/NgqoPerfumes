@@ -1,0 +1,27 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}Nqo Perfumes Administration{% endblock %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'admin/nqo-admin.css' %}">
+{% endblock %}
+
+{% block branding %}
+    <div class="nqo-branding">
+        <span class="nqo-brand-mark">N</span>
+        <div>
+            <div class="nqo-brand-name">Nqo Perfumes</div>
+            <div class="nqo-brand-subtitle">Administration</div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block nav-global %}
+    <div class="nqo-admin-nav-note" aria-label="Administration guidance">
+        <span>Manage your catalogue</span>
+        <span class="nqo-nav-dot" aria-hidden="true">•</span>
+        <span>Update products and images safely</span>
+    </div>
+{% endblock %}
