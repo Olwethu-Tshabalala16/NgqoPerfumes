@@ -1,0 +1,18 @@
+{% extends "admin/change_form.html" %}
+
+{% block form_top %}
+    <section class="nqo-product-guide" aria-labelledby="nqo-product-guide-title">
+        <div class="nqo-guide-icon" aria-hidden="true">N</div>
+        <div class="nqo-guide-copy">
+            <h2 id="nqo-product-guide-title">Product details</h2>
+            <p>Complete the product information below, then add a clear product image. The image is used on the customer-facing catalogue.</p>
+            <div class="nqo-guide-steps" aria-label="Product entry steps">
+                <span><strong>1</strong> Name &amp; description</span>
+                <span><strong>2</strong> Price &amp; stock</span>
+                <span><strong>3</strong> Product image</span>
+                <span><strong>4</strong> Save</span>
+            </div>
+        </div>
+    </section>
+    {{ block.super }}
+{% endblock %}
