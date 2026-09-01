@@ -1,0 +1,27 @@
+{% extends "admin/base.html" %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <style>
+        :root, html[data-theme="light"] {
+            --primary:#C9A96E; --secondary:#2C2A2A; --link-fg:#8F713B; --link-selected-fg:#6F552A;
+            --header-color:#2C2A2A; --header-branding-color:#2C2A2A; --body-fg:#2C2A2A;
+            --body-bg:#FDFBF7; --darkened-bg:#F7F0E6; --selected-row:#FFF9EF;
+            --hairline-color:#F0E8D8; --border-color:#D9D0C2; --button-bg:#2C2A2A; --button-hover-bg:#474343;
+        }
+        html,body{background:#FDFBF7!important;color:#2C2A2A;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif}
+        #header{background:linear-gradient(135deg,#C9A96E,#E8D5B5)!important;color:#2C2A2A!important;box-shadow:0 2px 12px rgba(201,169,110,.30);border-bottom:1px solid #C9A96E}
+        #branding h1,#branding h1 a,#user-tools,#user-tools a{color:#2C2A2A!important}#branding h1{font-weight:700;letter-spacing:2px}
+        #content{max-width:1440px;margin:0 auto;padding:28px}
+        .module,#content-related .module,.submit-row{background:#fff;border:1px solid #F0E8D8;border-radius:14px;box-shadow:0 4px 12px rgba(201,169,110,.12);overflow:hidden}
+        .module caption,.module h2,.module h3,#content-related h2{background:#F7F0E6;color:#2C2A2A;border-bottom:1px solid #F0E8D8}
+        input[type=text],input[type=password],input[type=number],input[type=email],input[type=url],textarea,select{border:1px solid #D9D0C2;border-radius:8px;background:#fff;color:#2C2A2A}
+        input:focus,textarea:focus,select:focus{border-color:#C9A96E!important;outline:3px solid rgba(201,169,110,.18)!important}
+        .button,input[type=submit],input[type=button],.submit-row input,a.button{border-radius:9px;font-weight:600}
+        .button.default,input[type=submit].default,.submit-row input.default{background:#2C2A2A;border-color:#2C2A2A;color:#FDFBF7}
+        .button.default:hover,input[type=submit].default:hover,.submit-row input.default:hover{background:#474343}
+        a:link,a:visited{color:#8F713B}a:hover{color:#2C2A2A}
+        #changelist,#changelist-filter{background:#fff;border-color:#F0E8D8}#changelist table thead th{background:#F7F0E6;color:#2C2A2A}#changelist table tbody tr:hover{background:#FFF9EF}
+        @media(max-width:900px){#content{padding:20px 16px 34px}}@media(max-width:640px){#content{padding:16px 10px 28px}}
+    </style>
+{% endblock %}
