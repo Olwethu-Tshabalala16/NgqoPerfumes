@@ -2,8 +2,10 @@
 Django settings for myshop project.
 """
 
-from pathlib import Path
 import os
+from pathlib import Path
+
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -12,7 +14,10 @@ DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 
 ALLOWED_HOSTS = [
     host.strip()
-    for host in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    for host in os.getenv(
+        "DJANGO_ALLOWED_HOSTS",
+        "localhost,127.0.0.1",
+    ).split(",")
     if host.strip()
 ]
 
@@ -66,12 +71,24 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "myshop.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=0,
+            conn_health_checks=True,
+            ssl_require=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -97,27 +114,51 @@ ADMIN_2FA_EMAIL_SENDER = os.getenv(
 )
 ADMIN_2FA_EMAIL_SUBJECT = "Your login verification code"
 
-AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
-AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+# Supabase Storage S3-compatible configuration.
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_STORAGE_BUCKET = os.getenv(
+    "SUPABASE_STORAGE_BUCKET",
+    "product-images",
+)
+SUPABASE_STORAGE_ENDPOINT = os.getenv("SUPABASE_STORAGE_ENDPOINT")
+SUPABASE_STORAGE_REGION = os.getenv("SUPABASE_STORAGE_REGION", "local")
+SUPABASE_STORAGE_ACCESS_KEY_ID = os.getenv("SUPABASE_STORAGE_ACCESS_KEY_ID")
+SUPABASE_STORAGE_SECRET_ACCESS_KEY = os.getenv(
+    "SUPABASE_STORAGE_SECRET_ACCESS_KEY"
+)
+
+if SUPABASE_URL:
+    SUPABASE_PUBLIC_STORAGE_URL = (
+        f"{SUPABASE_URL}/storage/v1/object/public/"
+        f"{SUPABASE_STORAGE_BUCKET}"
+    )
+else:
+    SUPABASE_PUBLIC_STORAGE_URL = ""
+
+AWS_STORAGE_BUCKET_NAME = SUPABASE_STORAGE_BUCKET
+AWS_S3_REGION_NAME = SUPABASE_STORAGE_REGION
+AWS_S3_ENDPOINT_URL = SUPABASE_STORAGE_ENDPOINT
+AWS_ACCESS_KEY_ID = SUPABASE_STORAGE_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY = SUPABASE_STORAGE_SECRET_ACCESS_KEY
 AWS_S3_FILE_OVERWRITE = False
-AWS_QUERYSTRING_AUTH = True
+AWS_QUERYSTRING_AUTH = False
 AWS_S3_SIGNATURE_VERSION = "s3v4"
+AWS_S3_ADDRESSING_STYLE = "path"
 AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",
 }
 
-if not AWS_STORAGE_BUCKET_NAME:
-    raise RuntimeError("AWS_STORAGE_BUCKET_NAME must be configured.")
-
 STORAGES = {
     "default": {
-        "BACKEND": "storages.backends.s3.S3Storage",
+        "BACKEND": "store.storage.SupabaseS3Storage",
     },
     "staticfiles": {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
 
-MEDIA_URL = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/"
+MEDIA_URL = (
+    f"{SUPABASE_PUBLIC_STORAGE_URL}/"
+    if SUPABASE_PUBLIC_STORAGE_URL
+    else "/media/"
+)
