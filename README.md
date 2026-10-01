@@ -19,7 +19,8 @@ This project is therefore more than a practice e-commerce application. It starte
 - Allows product images to be uploaded through the Django admin.
 - Provides an administrative interface for managing catalogue products.
 - Provides stock-aware product information.
-- Uses AWS S3 for product media storage.
+- Uses Supabase PostgreSQL for persistent product data.
+- Uses Supabase Storage for persistent product images.
 - Uses Django's authentication and administrative tooling.
 - Includes two-factor authentication support for the admin area.
 - Serves the application with Gunicorn and static assets with WhiteNoise.
@@ -38,22 +39,23 @@ This project is therefore more than a practice e-commerce application. It starte
               +-------------+-------------+
               |                           |
               v                           v
-       Product Database              AWS S3
-       Product metadata             Product media
-       - name                       - images
+       Supabase PostgreSQL         Supabase Storage
+       Product metadata            Product images
+       - name                      - products/...
        - description
        - price
        - stock
        - timestamps
 ```
 
-The application separates **product metadata** from **product media**:
+The application separates **structured product data** from **product media**:
 
-- The Django database stores structured product information such as names, descriptions, prices and stock.
-- **Amazon S3** stores uploaded product images and provides cloud-based object storage for the application's media.
-- Django connects the product record to its uploaded image through the ImageField.
+- Supabase PostgreSQL stores product records such as names, descriptions, prices, stock and timestamps.
+- Supabase Storage stores uploaded product images.
+- Django's `Product.image` field uses a custom storage backend that talks to Supabase Storage through its S3-compatible API.
+- Public product images are served from the Supabase Storage public URL.
 
-This separation is important because object storage and relational application data solve different problems.
+Supabase Storage supports the S3 protocol, so the project can use Django's existing `django-storages` and `boto3` integration without using Amazon S3 itself.
 
 ## Technology Stack
 
@@ -61,10 +63,11 @@ This separation is important because object storage and relational application d
 |---|---|
 | Python | Application programming language |
 | Django 6.1 | Web framework and backend |
-| SQLite | Development database |
-| AWS S3 | Cloud object storage for product images |
-| django-storages | Django integration with S3 |
-| boto3 | AWS SDK used by the S3 storage integration |
+| PostgreSQL | Persistent application database |
+| Supabase | Managed PostgreSQL and object storage platform |
+| Supabase Storage | Cloud storage for product images |
+| django-storages | Django storage abstraction |
+| boto3 | S3-compatible storage client |
 | Pillow | Image processing |
 | Gunicorn | WSGI application server |
 | WhiteNoise | Static-file serving |
@@ -72,40 +75,67 @@ This separation is important because object storage and relational application d
 | Django OTP / Admin 2FA | Additional admin authentication security |
 | HTML/CSS | Frontend presentation |
 
-## AWS S3
+## Supabase PostgreSQL
 
-One of the important changes in this project was moving product media storage into AWS S3.
+The application uses the `DATABASE_URL` environment variable to connect Django's ORM to the Supabase PostgreSQL database.
 
-The application does not hard-code AWS credentials. Instead, the S3 bucket, region and credentials are supplied through environment variables:
+For a serverless deployment such as Vercel, use the Supabase **transaction pooler** connection string. Supabase documents transaction pooling for serverless functions and shared session pooling for IPv4-compatible persistent connections.
 
-```env
-AWS_STORAGE_BUCKET_NAME=your-bucket-name
-AWS_S3_REGION_NAME=us-east-1
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
+The database password must remain in environment variables and must never be committed to Git.
+
+## Supabase Storage
+
+Create a public file bucket named:
+
+```text
+product-images
 ```
 
-The application uses Django's storage abstraction, so the Product.image field can remain an ordinary Django ImageField while the underlying media is stored remotely in S3.
+The application uses Supabase Storage's S3-compatible endpoint.
 
-## Security and Configuration
+Required environment variables:
 
-Sensitive configuration belongs in environment variables rather than source code.
+```env
+SUPABASE_URL=https://PROJECT_REF.supabase.co
+SUPABASE_STORAGE_BUCKET=product-images
+SUPABASE_STORAGE_ENDPOINT=https://PROJECT_REF.storage.supabase.co/storage/v1/s3
+SUPABASE_STORAGE_REGION=PROJECT_REGION
+SUPABASE_STORAGE_ACCESS_KEY_ID=your-storage-s3-access-key
+SUPABASE_STORAGE_SECRET_ACCESS_KEY=your-storage-s3-secret
+```
+
+The S3 access key and secret are **server-side credentials**. They must only be configured in local environment variables or the deployment platform's secret/environment-variable settings.
+
+The application generates public image URLs in the following form:
+
+```text
+https://PROJECT_REF.supabase.co/storage/v1/object/public/product-images/products/...
+```
+
+## Environment Configuration
+
+Copy `.env.example` to a local `.env` file and replace the placeholders with your actual Supabase and Django configuration.
 
 Required configuration includes:
 
 ```env
 DJANGO_SECRET_KEY=your-secret-key
-DJANGO_DEBUG=False
+DJANGO_DEBUG=True
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
-CSRF_TRUSTED_ORIGINS=https://your-domain.example
-AWS_STORAGE_BUCKET_NAME=your-bucket-name
-AWS_S3_REGION_NAME=us-east-1
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
+
+DATABASE_URL=your-supabase-postgresql-connection-string
+
+SUPABASE_URL=https://PROJECT_REF.supabase.co
+SUPABASE_STORAGE_BUCKET=product-images
+SUPABASE_STORAGE_ENDPOINT=https://PROJECT_REF.storage.supabase.co/storage/v1/s3
+SUPABASE_STORAGE_REGION=your-project-region
+SUPABASE_STORAGE_ACCESS_KEY_ID=your-storage-access-key
+SUPABASE_STORAGE_SECRET_ACCESS_KEY=your-storage-secret
+
 ADMIN_2FA_EMAIL_SENDER=admin@example.com
 ```
 
-Do not commit real AWS credentials or production secrets to Git.
+Never commit `.env`.
 
 ## Running Locally
 
@@ -129,7 +159,7 @@ Install dependencies:
 pip install -r ../../../requirements.txt
 ```
 
-Set the required environment variables, then run migrations:
+Configure the Supabase environment variables, then run migrations:
 
 ```bash
 python manage.py migrate
@@ -151,27 +181,37 @@ The catalogue will then be available through the local Django server, with produ
 
 ## Data Model
 
-The core application currently uses a Product model containing:
+The core application uses a Product model containing:
 
-- name
-- description
-- price
-- stock
-- image
-- created_at
-- updated_at
+- `name`
+- `description`
+- `price`
+- `stock`
+- `image`
+- `created_at`
+- `updated_at`
 
-The model also exposes an is_in_stock() method so the application can determine whether a product currently has available stock.
+The `image` field remains a normal Django ImageField. Django's storage abstraction determines where the file is physically stored, so application code does not need to manually upload files to Supabase.
+
+The model also exposes an `is_in_stock()` method so the application can determine whether a product currently has available stock.
+
+## Security and Configuration
+
+Sensitive configuration belongs in environment variables rather than source code.
+
+The Supabase Storage S3 credentials provide server-side access and must never be exposed to browser-side JavaScript or committed to Git.
+
+The public product image bucket is intentionally public for catalogue delivery. Public access applies to downloads; administrative uploads and changes remain server-side operations authenticated by the storage credentials.
 
 ## What I Learned
 
 This project helped me understand the relationship between application development and cloud infrastructure.
 
-I learned that building a web application is not only about writing frontend and backend code. The application also needs somewhere to persist structured data, somewhere appropriate to store files, and a way to connect those services reliably.
+I learned that building a web application is not only about writing frontend and backend code. The application also needs somewhere appropriate to persist structured data, somewhere appropriate to store files, and a reliable way to connect those services.
 
-Using **AWS S3** was particularly important to me because I am aspiring to become a **data engineer**. Cloud platforms and cloud storage are fundamental parts of modern data systems. Understanding object storage, cloud resources, application configuration and how software interacts with cloud infrastructure gives me a stronger foundation for working with data platforms later.
+Using Supabase gives this project a managed PostgreSQL database and persistent object storage while keeping the Django application independent from a local filesystem.
 
-This project therefore became an early practical step toward combining software engineering with my longer-term interest in data engineering and cloud technologies.
+The project also demonstrates an important software-engineering principle: Django's storage abstraction allows the application model to remain stable while the underlying storage provider changes.
 
 ## Project Direction
 
