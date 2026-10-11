@@ -13,6 +13,7 @@ idna==3.18
 packaging==26.3
 pillow==12.3.0
 psycopg2-binary==2.9.12
+python-dotenv==1.1.1
 PyOTP==2.10.0
 qrcode==8.2
 requests==2.34.2

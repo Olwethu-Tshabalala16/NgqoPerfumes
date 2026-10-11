@@ -31,6 +31,16 @@ jobs:
           DJANGO_DEBUG: "True"
         run: python manage.py check
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check frontend JavaScript syntax
+        run: |
+          node --check frontend/app.js
+          node --check frontend/config.js
+
       - name: Run automated tests
         working-directory: nqoperfumes/myshop
         env:

@@ -14,67 +14,53 @@ This project is therefore more than a practice e-commerce application. It starte
 
 ## What the Application Does
 
-- Displays a catalogue of perfumes.
-- Stores product names, descriptions, prices and stock quantities.
-- Allows product images to be uploaded through the Django admin.
-- Provides an administrative interface for managing catalogue products.
-- Provides stock-aware product information.
+- Displays a searchable fragrance catalogue in a standalone frontend.
+- Exposes product names, descriptions, prices, stock quantities and image URLs through a JSON API.
+- Allows product records and images to be managed through Django Admin.
 - Uses Supabase PostgreSQL for persistent product data.
-- Uses Supabase Storage for persistent product images.
-- Uses Django's authentication and administrative tooling.
+- Uses Supabase Storage's S3-compatible API for persistent product images.
 - Includes two-factor authentication support for the admin area.
-- Serves the application with Gunicorn and static assets with WhiteNoise.
-
+- Serves the backend with Gunicorn and backend static assets with WhiteNoise.
 ## Architecture
 
+The customer-facing frontend and Django backend are separate applications. The frontend uses plain HTML, CSS and JavaScript and communicates with the backend over HTTP using JSON.
+
 ```text
-                         Customer
-                            |
-                            v
-                  +-------------------+
-                  |  Django Web App   |
-                  |   Python / HTML   |
-                  +---------+---------+
-                            |
-              +-------------+-------------+
-              |                           |
-              v                           v
-       Supabase PostgreSQL         Supabase Storage
-       Product metadata            Product images
-       - name                      - products/...
-       - description
-       - price
-       - stock
-       - timestamps
+frontend/ (HTML, CSS, JavaScript)
+          |
+          | GET /api/products/ (JSON)
+          v
+Django backend (Python)
+  |                   |
+  v                   v
+Supabase           Supabase Storage
+PostgreSQL         Product images
 ```
 
-The application separates **structured product data** from **product media**:
-
-- Supabase PostgreSQL stores product records such as names, descriptions, prices, stock and timestamps.
-- Supabase Storage stores uploaded product images.
-- Django's `Product.image` field uses a custom storage backend that talks to Supabase Storage through its S3-compatible API.
-- Public product images are served from the Supabase Storage public URL.
-
-Supabase Storage supports the S3 protocol, so the project can use Django's existing `django-storages` and `boto3` integration without using Amazon S3 itself.
-
+- `frontend/` contains the customer-facing catalogue and does not contain database or storage credentials.
+- `nqoperfumes/myshop/` contains Django settings, the product model, API endpoints and Django Admin.
+- `GET /api/products/` returns the public catalogue as JSON.
+- `GET /api/health/` provides a lightweight health check.
+- Supabase PostgreSQL stores structured product records.
+- Supabase Storage stores product images through `django-storages` and `boto3`.
+- CORS is restricted to origins explicitly configured with `CORS_ALLOWED_ORIGINS`.
 ## Technology Stack
 
 | Technology | Purpose |
 |---|---|
-| Python | Application programming language |
-| Django 6.1 | Web framework and backend |
+| Python | Backend programming language |
+| Django 6.1 | Backend framework, ORM and administration |
+| Django JSON views | Lightweight read-only catalogue API |
+| HTML, CSS and JavaScript | Independent customer-facing frontend |
 | PostgreSQL | Persistent application database |
 | Supabase | Managed PostgreSQL and object storage platform |
-| Supabase Storage | Cloud storage for product images |
-| django-storages | Django storage abstraction |
-| boto3 | S3-compatible storage client |
+| django-storages / boto3 | S3-compatible product image storage |
+| django-cors-headers | Configurable cross-origin access for the frontend |
+| python-dotenv | Load local environment variables from `.env` |
 | Pillow | Image processing |
 | Gunicorn | WSGI application server |
-| WhiteNoise | Static-file serving |
-| Django Admin | Product and inventory management |
-| Django OTP / Admin 2FA | Additional admin authentication security |
-| HTML/CSS | Frontend presentation |
-
+| WhiteNoise | Backend static-file serving |
+| Django Admin / Admin 2FA | Product management and additional authentication security |
 ## Supabase PostgreSQL
 
 The application uses the `DATABASE_URL` environment variable to connect Django's ORM to the Supabase PostgreSQL database.
@@ -239,46 +225,57 @@ Changing the environment variables connects NqoPerfumes to a different backend; 
 
 ## Running Locally
 
-Clone the repository and enter the Django project:
+### 1. Install and configure the backend
 
-```bash
-git clone https://github.com/Olwethu-Tshabalala16/NqoPerfumes.git
-cd NqoPerfumes/nqoperfumes/myshop
-```
-
-Create a virtual environment:
+From the repository root:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
 ```
 
-Install dependencies:
+Edit `.env` with your own Django secret, Supabase PostgreSQL connection string, and Supabase Storage credentials. Do not commit the real `.env` file.
+
+Start the Django backend:
 
 ```bash
-pip install -r ../../../requirements.txt
-```
-
-Configure the Supabase environment variables, then run migrations:
-
-```bash
+cd nqoperfumes/myshop
 python manage.py migrate
-```
-
-Create an administrator:
-
-```bash
 python manage.py createsuperuser
-```
-
-Start the development server:
-
-```bash
 python manage.py runserver
 ```
 
-The catalogue will then be available through the local Django server, with product management available through Django Admin.
+The backend API is available at:
 
+- `http://127.0.0.1:8000/api/products/` — product catalogue JSON.
+- `http://127.0.0.1:8000/api/health/` — health check.
+- `http://127.0.0.1:8000/admin/` — product administration.
+
+For local development, the default `.env.example` CORS origins allow a frontend served on port 5500.
+
+### 2. Run the separate frontend
+
+Open a second terminal from the repository root:
+
+```bash
+cd frontend
+python -m http.server 5500
+```
+
+Open `http://127.0.0.1:5500` in your browser. The frontend's `config.js` points to the local Django API by default. When deploying, change `API_BASE_URL` to the public backend origin, or use an empty string when frontend and backend share the same origin. Add the deployed frontend origin to `CORS_ALLOWED_ORIGINS` on the backend.
+
+### 3. Run the backend tests
+
+From `nqoperfumes/myshop` with the virtual environment activated:
+
+```bash
+python manage.py check
+python manage.py test
+```
+
+The GitHub Actions workflow runs Django checks, automated backend tests and frontend JavaScript syntax checks on pushes and pull requests.
 ## Data Model
 
 The core application uses a Product model containing:
