@@ -4,6 +4,7 @@
   const config = window.NQO_CONFIG || {};
   const apiBaseUrl = (config.API_BASE_URL || "").replace(/\/+$/, "");
   const productsEndpoint = `${apiBaseUrl}/api/products/`;
+  const catalogueJsonUrl = (config.CATALOGUE_JSON_URL || "").trim();
 
   const grid = document.querySelector("#product-grid");
   const status = document.querySelector("#catalogue-status");
@@ -113,7 +114,9 @@
     grid.replaceChildren();
 
     try {
-      const response = await fetch(productsEndpoint, {
+      // In production, read the persistent JSON snapshot directly from Supabase.
+      // The Django API remains a convenient fallback for local development.
+      const response = await fetch(catalogueJsonUrl || productsEndpoint, {
         headers: { Accept: "application/json" }
       });
       if (!response.ok) {
@@ -121,7 +124,9 @@
       }
 
       const payload = await response.json();
-      products = Array.isArray(payload.results) ? payload.results : [];
+      products = Array.isArray(payload.products)
+        ? payload.products
+        : (Array.isArray(payload.results) ? payload.results : []);
       filterProducts();
     } catch (error) {
       console.error("Unable to load the product catalogue:", error);
