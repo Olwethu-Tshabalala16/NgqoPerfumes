@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "buildCommand": "python scripts/build_vercel.py",
+  "outputDirectory": "frontend",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.py" },
+    { "source": "/admin", "destination": "/api/index.py" },
+    { "source": "/admin/(.*)", "destination": "/api/index.py" },
+    { "source": "/admin-2fa", "destination": "/api/index.py" },
+    { "source": "/admin-2fa/(.*)", "destination": "/api/index.py" }
+  ]
+}
