@@ -36,6 +36,12 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Validate Vercel build command
+        env:
+          DJANGO_SECRET_KEY: ci-only-secret-key
+          DJANGO_DEBUG: "True"
+        run: python scripts/build_vercel.py
+
       - name: Check frontend JavaScript syntax
         run: |
           node --check frontend/app.js
