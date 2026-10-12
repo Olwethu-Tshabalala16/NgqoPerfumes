@@ -15,6 +15,9 @@ load_dotenv(BASE_DIR.parent.parent / ".env")
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-change-me")
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 
+if os.getenv("VERCEL") and SECRET_KEY == "dev-only-change-me":
+    raise ImproperlyConfigured("Set a unique DJANGO_SECRET_KEY in Vercel environment variables.")
+
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv(
