@@ -245,6 +245,50 @@ If database access works but image uploads fail, check the Storage endpoint, reg
 
 Changing the environment variables connects NqoPerfumes to a different backend; it does **not** migrate existing data. If you are moving an existing catalogue, export and import the database records and separately copy the image files to the new bucket. Check image paths and URLs after migration.
 
+
+## Deploying on Vercel with Supabase
+
+This repository is configured for **Vercel** hosting: Vercel serves the static customer-facing frontend from `frontend/` and routes the Django API, Admin and Admin 2FA endpoints to the Python function in `api/index.py`. Supabase is the persistent PostgreSQL database and object storage provider. Do not deploy the Django backend to a filesystem-based host that discards local writes.
+
+### Required Vercel project settings
+
+- **Root Directory:** repository root (leave blank/default).
+- **Build Command:** `python scripts/build_vercel.py` (also defined in `vercel.json`).
+- **Output Directory:** `frontend` (also defined in `vercel.json`).
+- **Install Command:** leave the default; Vercel installs dependencies from the root `requirements.txt`.
+
+Add these environment variables in Vercel for **Production** and any Preview environment you intend to use:
+
+- `DJANGO_SECRET_KEY`: a long, unique random secret.
+- `DJANGO_DEBUG=False`.
+- `DJANGO_ALLOWED_HOSTS=.vercel.app,your-custom-domain.example` (replace the custom-domain example if applicable; `.vercel.app` allows Vercel deployment hostnames).
+- `CSRF_TRUSTED_ORIGINS=https://your-project.vercel.app,https://your-custom-domain.example` (use the actual HTTPS origins; do not include a trailing slash).
+- `DATABASE_URL`: Supabase PostgreSQL connection string. Use the connection mode Supabase recommends for your Vercel deployment and URL-encode special characters in the password.
+- `SUPABASE_URL`: your actual Supabase project URL, for example `https://YOUR_PROJECT_REF.supabase.co`.
+- `SUPABASE_STORAGE_BUCKET=product-images`.
+- `SUPABASE_STORAGE_ENDPOINT`, `SUPABASE_STORAGE_REGION`, `SUPABASE_STORAGE_ACCESS_KEY_ID`, and `SUPABASE_STORAGE_SECRET_ACCESS_KEY`: the S3-compatible Storage settings from your Supabase project. Keep access keys and secrets server-side only.
+- SMTP settings for email-based admin 2FA: `EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS=True`, and `DEFAULT_FROM_EMAIL`. The console email backend is for local development and does not deliver email from production.
+- `ADMIN_2FA_EMAIL_SENDER`: sender address used by the admin 2FA package.
+
+The build script generates `frontend/config.js` using `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`, so the public catalogue URL points to `catalogue/products.json` in your own Supabase bucket. On Vercel, the frontend uses same-origin rewrites for its Django API fallback. If Supabase URL is not configured at build time, the frontend falls back to the Django API; set the variable and redeploy to use the published JSON snapshot.
+
+### One-time Supabase setup before first production use
+
+1. Create the Supabase project and a public Storage bucket named `product-images`.
+2. Generate S3-compatible Storage credentials and add them as Vercel environment variables. The public bucket permits catalogue visitors to read product images and the JSON snapshot; it does not make the secret upload credentials public.
+3. Configure `DATABASE_URL` and all other variables before the first Vercel deployment. Production settings deliberately reject a missing database URL rather than silently using ephemeral SQLite.
+4. From a trusted local environment with the production environment variables loaded, run `python manage.py migrate` and `python manage.py createsuperuser` from `nqoperfumes/myshop/`. These commands must point at your Supabase database. Do not commit the local database or production credentials.
+5. Deploy from the repository root on Vercel. The build script collects Django Admin static assets and generates the frontend configuration.
+6. Open `https://YOUR_PROJECT.vercel.app/admin/`, sign in, and create a test product with an image. Verify that the product row exists in Supabase PostgreSQL, the image appears under `products/` in the `product-images` bucket, and `catalogue/products.json` is publicly readable. The Admin should report whether catalogue publishing succeeded.
+7. Verify `/api/health/` returns JSON with `status: ok` and the public frontend displays the test product. Delete the test product after verification if it is not intended for customers.
+
+### Important deployment limits
+
+- Vercel's filesystem is not persistent. Product images must be stored in Supabase Storage, not a local `media/` folder, and product data must use Supabase PostgreSQL, not SQLite.
+- Migrations and superuser creation are deliberate one-time/manual operations; they are not run automatically during each deployment.
+- This repository does not contain your Supabase credentials and cannot configure the Supabase project or Vercel environment variables on your behalf. The deployment is not live until those real values are added and the end-to-end upload/read test passes.
+- Never put Supabase Storage secrets, database passwords, SMTP passwords or the Django secret key in `frontend/config.js`, browser code, Git history or screenshots.
+
 ## Running Locally
 
 ### 1. Install and configure the backend
