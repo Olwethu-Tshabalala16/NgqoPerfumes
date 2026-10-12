@@ -40,6 +40,7 @@ jobs:
         run: |
           node --check frontend/app.js
           node --check frontend/config.js
+          python -m py_compile api/index.py scripts/build_vercel.py
 
       - name: Run automated tests
         working-directory: nqoperfumes/myshop
