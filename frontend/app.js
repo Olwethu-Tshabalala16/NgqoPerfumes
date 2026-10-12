@@ -10,6 +10,13 @@
   const status = document.querySelector("#catalogue-status");
   const searchInput = document.querySelector("#product-search");
   const year = document.querySelector("#current-year");
+  const productDialog = document.querySelector("#product-dialog");
+  const dialogImage = document.querySelector("#dialog-product-image");
+  const dialogName = document.querySelector("#dialog-product-name");
+  const dialogDescription = document.querySelector("#dialog-product-description");
+  const dialogPrice = document.querySelector("#dialog-product-price");
+  const dialogStock = document.querySelector("#dialog-product-stock");
+  const dialogClose = document.querySelector("#dialog-close");
   let products = [];
 
   year.textContent = new Date().getFullYear();
@@ -32,6 +39,18 @@
 
   function makeProductCard(product) {
     const card = element("article", "product-card");
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-haspopup", "dialog");
+    card.setAttribute("aria-label", `View full details for ${product.name || "this fragrance"}`);
+    card.addEventListener("click", () => openProductDetails(product));
+    card.addEventListener("keydown", (event) => {
+      if (event.target !== card) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openProductDetails(product);
+      }
+    });
     const imageFrame = element("div", "product-image");
     const placeholder = element("span", "image-placeholder", "✳");
     placeholder.setAttribute("aria-hidden", "true");
@@ -68,10 +87,39 @@
     );
 
     footer.append(price, stock);
-    body.append(name, description, footer);
+    const detailsHint = element("span", "product-details-hint", "Tap to read full description ↗");
+    body.append(name, description, detailsHint, footer);
     card.append(imageFrame, body);
     return card;
   }
+
+  function openProductDetails(product) {
+    dialogName.textContent = product.name || "Untitled fragrance";
+    dialogDescription.textContent = product.description || "Contact us for more information about this fragrance.";
+    dialogPrice.textContent = formatPrice(product.price);
+
+    const available = Boolean(product.is_in_stock);
+    dialogStock.textContent = available ? `In stock · ${product.stock}` : "Out of stock";
+    dialogStock.className = available ? "stock-status in-stock" : "stock-status out-of-stock";
+
+    if (product.image_url) {
+      dialogImage.src = product.image_url;
+      dialogImage.alt = product.name ? `${product.name} fragrance` : "Fragrance product";
+      dialogImage.hidden = false;
+    } else {
+      dialogImage.removeAttribute("src");
+      dialogImage.alt = "";
+      dialogImage.hidden = true;
+    }
+
+    if (!productDialog.open) productDialog.showModal();
+  }
+
+  dialogClose.addEventListener("click", () => productDialog.close());
+  productDialog.addEventListener("click", (event) => {
+    // A click on the shaded backdrop closes the detail view; clicks inside do not.
+    if (event.target === productDialog) productDialog.close();
+  });
 
   function renderProducts(items) {
     grid.replaceChildren();
