@@ -1,2 +1,0 @@
-# Keep the root requirements.txt as the single source of truth.
--r ../../../requirements.txt
