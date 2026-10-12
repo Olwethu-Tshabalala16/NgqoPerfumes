@@ -161,32 +161,46 @@
     status.textContent = "Loading fragrances…";
     grid.replaceChildren();
 
-    try {
-      // In production, read the persistent JSON snapshot directly from Supabase.
-      // The Django API remains a convenient fallback for local development.
-      const response = await fetch(catalogueJsonUrl || productsEndpoint, {
-        headers: { Accept: "application/json" }
-      });
-      if (!response.ok) {
-        throw new Error(`The catalogue service returned HTTP ${response.status}.`);
-      }
+    const sources = catalogueJsonUrl
+      ? [catalogueJsonUrl, productsEndpoint]
+      : [productsEndpoint];
+    let lastError = null;
 
-      const payload = await response.json();
-      products = Array.isArray(payload.products)
-        ? payload.products
-        : (Array.isArray(payload.results) ? payload.results : []);
-      filterProducts();
-    } catch (error) {
-      console.error("Unable to load the product catalogue:", error);
-      status.textContent = "The catalogue could not be loaded.";
-      const retry = element("button", "retry-button", "Try again");
-      retry.type = "button";
-      retry.addEventListener("click", loadProducts);
-      grid.replaceChildren(
-        element("p", "error-message", "Check your connection and the catalogue API configuration, then try again."),
-        retry
-      );
+    for (const source of sources) {
+      try {
+        const response = await fetch(source, {
+          headers: { Accept: "application/json" }
+        });
+        if (!response.ok) {
+          throw new Error(`The catalogue service returned HTTP ${response.status}.`);
+        }
+
+        const payload = await response.json();
+        const items = Array.isArray(payload.products)
+          ? payload.products
+          : (Array.isArray(payload.results) ? payload.results : null);
+        if (!items) {
+          throw new Error("The catalogue response has an unexpected format.");
+        }
+
+        products = items;
+        filterProducts();
+        return;
+      } catch (error) {
+        lastError = error;
+        console.warn(`Catalogue source failed (${source}); trying the next source if available.`, error);
+      }
     }
+
+    console.error("Unable to load the product catalogue:", lastError);
+    status.textContent = "The catalogue could not be loaded.";
+    const retry = element("button", "retry-button", "Try again");
+    retry.type = "button";
+    retry.addEventListener("click", loadProducts);
+    grid.replaceChildren(
+      element("p", "error-message", "Check your connection and the catalogue configuration, then try again."),
+      retry
+    );
   }
 
   searchInput.addEventListener("input", filterProducts);
