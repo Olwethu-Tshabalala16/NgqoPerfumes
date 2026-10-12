@@ -17,8 +17,9 @@ This project is therefore more than a practice e-commerce application. It starte
 - Displays a searchable fragrance catalogue in a standalone frontend.
 - Exposes product names, descriptions, prices, stock quantities and image URLs through a JSON API.
 - Allows product records and images to be managed through Django Admin.
-- Uses Supabase PostgreSQL for persistent product data.
-- Uses Supabase Storage's S3-compatible API for persistent product images.
+- Publishes the full product catalogue as a JSON file in Supabase Storage whenever an admin adds, edits or deletes a product.
+- Uses Supabase Storage's S3-compatible API for persistent product images; the JSON catalogue stores each image's public URL.
+- Loads the customer-facing catalogue directly from that persistent Supabase JSON file in production, so a website redeployment does not remove the catalogue.
 - Includes two-factor authentication support for the admin area.
 - Serves the backend with Gunicorn and backend static assets with WhiteNoise.
 ## Architecture
@@ -26,23 +27,26 @@ This project is therefore more than a practice e-commerce application. It starte
 The customer-facing frontend and Django backend are separate applications. The frontend uses plain HTML, CSS and JavaScript and communicates with the backend over HTTP using JSON.
 
 ```text
-frontend/ (HTML, CSS, JavaScript)
-          |
-          | GET /api/products/ (JSON)
-          v
-Django backend (Python)
-  |                   |
-  v                   v
-Supabase           Supabase Storage
-PostgreSQL         Product images
+Admin (Django Admin)
+        |
+        | save/edit/delete product
+        v
+Django backend (Python) ---- uploads image ----> Supabase Storage
+        |                                         | product-images/products/...
+        | serializes all products                 | catalogue/products.json
+        +---------------------------------------->|
+                                                  ^
+                                                  | fetch public JSON
+Frontend (HTML, CSS, JavaScript) -----------------+
 ```
 
 - `frontend/` contains the customer-facing catalogue and does not contain database or storage credentials.
 - `nqoperfumes/myshop/` contains Django settings, the product model, API endpoints and Django Admin.
-- `GET /api/products/` returns the public catalogue as JSON.
-- `GET /api/health/` provides a lightweight health check.
-- Supabase PostgreSQL stores structured product records.
-- Supabase Storage stores product images through `django-storages` and `boto3`.
+- Saving, editing or deleting a product in Django Admin republishes the complete catalogue to the fixed Supabase Storage object `catalogue/products.json`.
+- Each JSON product record includes its name, description, price, stock, availability, image URL and timestamps.
+- Product image files are stored separately in the `product-images` bucket under `products/`; the JSON catalogue points to those durable public image URLs.
+- The frontend reads the public JSON object directly when `CATALOGUE_JSON_URL` is configured. The Django `GET /api/products/` endpoint remains available as a local-development fallback, and `GET /api/health/` provides a lightweight health check.
+- Supabase PostgreSQL remains the Django admin's structured product database; Supabase Storage is the persistent, redeployment-independent catalogue and image store.
 - CORS is restricted to origins explicitly configured with `CORS_ALLOWED_ORIGINS`.
 ## Technology Stack
 
@@ -97,6 +101,24 @@ The application generates public image URLs in the following form:
 ```text
 https://PROJECT_REF.supabase.co/storage/v1/object/public/product-images/products/...
 ```
+
+### Persistent JSON catalogue
+
+The same public `product-images` bucket also stores the generated catalogue at:
+
+```text
+catalogue/products.json
+```
+
+When an administrator adds, edits or deletes a product in Django Admin, the backend serializes the full current product list and overwrites that one fixed JSON object. This avoids creating a new JSON filename for each edit. The image bytes remain separate objects in Supabase Storage; each JSON record includes the corresponding public `image_url`. Product names, descriptions, prices and stock values are not stored in the image files themselves.
+
+For production, set `CATALOGUE_JSON_URL` in `frontend/config.js` to the public URL for that JSON object, using this format:
+
+```text
+https://PROJECT_REF.supabase.co/storage/v1/object/public/product-images/catalogue/products.json
+```
+
+Do not leave `CATALOGUE_JSON_URL` empty in production: an empty value makes the frontend use the Django API fallback instead of reading the persistent JSON snapshot directly. After configuring Supabase, save a product in Django Admin to publish the initial catalogue. The admin shows a success message when publishing succeeds and an error message if the JSON upload fails.
 
 ## Environment Configuration
 
