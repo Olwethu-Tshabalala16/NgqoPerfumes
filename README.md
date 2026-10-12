@@ -14,67 +14,57 @@ This project is therefore more than a practice e-commerce application. It starte
 
 ## What the Application Does
 
-- Displays a catalogue of perfumes.
-- Stores product names, descriptions, prices and stock quantities.
-- Allows product images to be uploaded through the Django admin.
-- Provides an administrative interface for managing catalogue products.
-- Provides stock-aware product information.
-- Uses Supabase PostgreSQL for persistent product data.
-- Uses Supabase Storage for persistent product images.
-- Uses Django's authentication and administrative tooling.
+- Displays a searchable fragrance catalogue in a standalone frontend.
+- Exposes product names, descriptions, prices, stock quantities and image URLs through a JSON API.
+- Allows product records and images to be managed through Django Admin.
+- Publishes the full product catalogue as a JSON file in Supabase Storage whenever an admin adds, edits or deletes a product.
+- Uses Supabase Storage's S3-compatible API for persistent product images; the JSON catalogue stores each image's public URL.
+- Loads the customer-facing catalogue directly from that persistent Supabase JSON file in production, so a website redeployment does not remove the catalogue.
 - Includes two-factor authentication support for the admin area.
-- Serves the application with Gunicorn and static assets with WhiteNoise.
-
+- Serves the backend with Gunicorn and backend static assets with WhiteNoise.
 ## Architecture
 
+The customer-facing frontend and Django backend are separate applications. The frontend uses plain HTML, CSS and JavaScript and communicates with the backend over HTTP using JSON.
+
 ```text
-                         Customer
-                            |
-                            v
-                  +-------------------+
-                  |  Django Web App   |
-                  |   Python / HTML   |
-                  +---------+---------+
-                            |
-              +-------------+-------------+
-              |                           |
-              v                           v
-       Supabase PostgreSQL         Supabase Storage
-       Product metadata            Product images
-       - name                      - products/...
-       - description
-       - price
-       - stock
-       - timestamps
+Admin (Django Admin)
+        |
+        | save/edit/delete product
+        v
+Django backend (Python) ---- uploads image ----> Supabase Storage
+        |                                         | product-images/products/...
+        | serializes all products                 | catalogue/products.json
+        +---------------------------------------->|
+                                                  ^
+                                                  | fetch public JSON
+Frontend (HTML, CSS, JavaScript) -----------------+
 ```
 
-The application separates **structured product data** from **product media**:
-
-- Supabase PostgreSQL stores product records such as names, descriptions, prices, stock and timestamps.
-- Supabase Storage stores uploaded product images.
-- Django's `Product.image` field uses a custom storage backend that talks to Supabase Storage through its S3-compatible API.
-- Public product images are served from the Supabase Storage public URL.
-
-Supabase Storage supports the S3 protocol, so the project can use Django's existing `django-storages` and `boto3` integration without using Amazon S3 itself.
-
+- `frontend/` contains the customer-facing catalogue and does not contain database or storage credentials.
+- `nqoperfumes/myshop/` contains Django settings, the product model, API endpoints and Django Admin.
+- Saving, editing or deleting a product in Django Admin republishes the complete catalogue to the fixed Supabase Storage object `catalogue/products.json`.
+- Each JSON product record includes its name, description, price, stock, availability, image URL and timestamps.
+- Product image files are stored separately in the `product-images` bucket under `products/`; the JSON catalogue points to those durable public image URLs.
+- The frontend reads the public JSON object directly when `CATALOGUE_JSON_URL` is configured. The Django `GET /api/products/` endpoint remains available as a local-development fallback, and `GET /api/health/` provides a lightweight health check.
+- Supabase PostgreSQL remains the Django admin's structured product database; Supabase Storage is the persistent, redeployment-independent catalogue and image store.
+- CORS is restricted to origins explicitly configured with `CORS_ALLOWED_ORIGINS`.
 ## Technology Stack
 
 | Technology | Purpose |
 |---|---|
-| Python | Application programming language |
-| Django 6.1 | Web framework and backend |
+| Python | Backend programming language |
+| Django 6.1 | Backend framework, ORM and administration |
+| Django JSON views | Lightweight read-only catalogue API |
+| HTML, CSS and JavaScript | Independent customer-facing frontend |
 | PostgreSQL | Persistent application database |
 | Supabase | Managed PostgreSQL and object storage platform |
-| Supabase Storage | Cloud storage for product images |
-| django-storages | Django storage abstraction |
-| boto3 | S3-compatible storage client |
+| django-storages / boto3 | S3-compatible product image storage |
+| django-cors-headers | Configurable cross-origin access for the frontend |
+| python-dotenv | Load local environment variables from `.env` |
 | Pillow | Image processing |
 | Gunicorn | WSGI application server |
-| WhiteNoise | Static-file serving |
-| Django Admin | Product and inventory management |
-| Django OTP / Admin 2FA | Additional admin authentication security |
-| HTML/CSS | Frontend presentation |
-
+| WhiteNoise | Backend static-file serving |
+| Django Admin / Admin 2FA | Product management and additional authentication security |
 ## Supabase PostgreSQL
 
 The application uses the `DATABASE_URL` environment variable to connect Django's ORM to the Supabase PostgreSQL database.
@@ -111,6 +101,24 @@ The application generates public image URLs in the following form:
 ```text
 https://PROJECT_REF.supabase.co/storage/v1/object/public/product-images/products/...
 ```
+
+### Persistent JSON catalogue
+
+The same public `product-images` bucket also stores the generated catalogue at:
+
+```text
+catalogue/products.json
+```
+
+When an administrator adds, edits or deletes a product in Django Admin, the backend serializes the full current product list and overwrites that one fixed JSON object. This avoids creating a new JSON filename for each edit. The image bytes remain separate objects in Supabase Storage; each JSON record includes the corresponding public `image_url`. Product names, descriptions, prices and stock values are not stored in the image files themselves.
+
+For production, set `CATALOGUE_JSON_URL` in `frontend/config.js` to the public URL for that JSON object, using this format:
+
+```text
+https://PROJECT_REF.supabase.co/storage/v1/object/public/product-images/catalogue/products.json
+```
+
+Do not leave `CATALOGUE_JSON_URL` empty in production: an empty value makes the frontend use the Django API fallback instead of reading the persistent JSON snapshot directly. After configuring Supabase, save a product in Django Admin to publish the initial catalogue. The admin shows a success message when publishing succeeds and an error message if the JSON upload fails.
 
 ## Environment Configuration
 
@@ -239,46 +247,57 @@ Changing the environment variables connects NqoPerfumes to a different backend; 
 
 ## Running Locally
 
-Clone the repository and enter the Django project:
+### 1. Install and configure the backend
 
-```bash
-git clone https://github.com/Olwethu-Tshabalala16/NqoPerfumes.git
-cd NqoPerfumes/nqoperfumes/myshop
-```
-
-Create a virtual environment:
+From the repository root:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
 ```
 
-Install dependencies:
+Edit `.env` with your own Django secret, Supabase PostgreSQL connection string, and Supabase Storage credentials. Do not commit the real `.env` file.
+
+Start the Django backend:
 
 ```bash
-pip install -r ../../../requirements.txt
-```
-
-Configure the Supabase environment variables, then run migrations:
-
-```bash
+cd nqoperfumes/myshop
 python manage.py migrate
-```
-
-Create an administrator:
-
-```bash
 python manage.py createsuperuser
-```
-
-Start the development server:
-
-```bash
 python manage.py runserver
 ```
 
-The catalogue will then be available through the local Django server, with product management available through Django Admin.
+The backend API is available at:
 
+- `http://127.0.0.1:8000/api/products/` — product catalogue JSON.
+- `http://127.0.0.1:8000/api/health/` — health check.
+- `http://127.0.0.1:8000/admin/` — product administration.
+
+For local development, the default `.env.example` CORS origins allow a frontend served on port 5500.
+
+### 2. Run the separate frontend
+
+Open a second terminal from the repository root:
+
+```bash
+cd frontend
+python -m http.server 5500
+```
+
+Open `http://127.0.0.1:5500` in your browser. The frontend's `config.js` points to the local Django API by default. When deploying, change `API_BASE_URL` to the public backend origin, or use an empty string when frontend and backend share the same origin. Add the deployed frontend origin to `CORS_ALLOWED_ORIGINS` on the backend.
+
+### 3. Run the backend tests
+
+From `nqoperfumes/myshop` with the virtual environment activated:
+
+```bash
+python manage.py check
+python manage.py test
+```
+
+The GitHub Actions workflow runs Django checks, automated backend tests and frontend JavaScript syntax checks on pushes and pull requests.
 ## Data Model
 
 The core application uses a Product model containing:
