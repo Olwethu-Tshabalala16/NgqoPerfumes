@@ -7,6 +7,7 @@ from pathlib import Path
 
 import dj_database_url
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent.parent / ".env")
@@ -82,6 +83,10 @@ WSGI_APPLICATION = "myshop.wsgi.application"
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Vercel instances are ephemeral: never silently fall back to SQLite in production.
+if os.getenv("VERCEL") and not DATABASE_URL:
+    raise ImproperlyConfigured("Set DATABASE_URL to your Supabase PostgreSQL connection string in Vercel.")
+
 if DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.parse(
@@ -112,9 +117,22 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "static"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# Vercel terminates HTTPS at its edge proxy.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "admin@example.com")
 
 ADMIN_2FA_ENABLE_EMAIL_OTP = True
 ADMIN_2FA_EMAIL_SENDER = os.getenv(
