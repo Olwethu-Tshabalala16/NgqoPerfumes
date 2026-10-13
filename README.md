@@ -112,7 +112,7 @@ catalogue/products.json
 
 When an administrator adds, edits or deletes a product in Django Admin, the backend serializes the full current product list and overwrites that one fixed JSON object. This avoids creating a new JSON filename for each edit. The image bytes remain separate objects in Supabase Storage; each JSON record includes the corresponding public `image_url`. Product names, descriptions, prices and stock values are not stored in the image files themselves.
 
-For production, set `CATALOGUE_JSON_URL` in `frontend/config.js` to the public URL for that JSON object, using this format:
+During a Vercel build, `scripts/build_vercel.py` generates `frontend/config.js` from `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`. Do not manually edit the generated deployment configuration; the checked-in `frontend/config.js` is the local-development default. The production catalogue URL follows this format:
 
 ```text
 https://PROJECT_REF.supabase.co/storage/v1/object/public/product-images/catalogue/products.json
@@ -168,7 +168,7 @@ Keep the database password available for the database connection setup. Do not p
 The example in `.env.example` uses this general format:
 
 ```env
-DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@POOLER_HOST:5432/postgres
+DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@POOLER_HOST:6543/postgres
 ```
 
 This is a template, not a working connection string. Use the exact host, port, username, and database name provided by Supabase. URL-encode special characters in the password if required by the connection-string format.
@@ -270,7 +270,7 @@ Add these environment variables in Vercel for **Production** and any Preview env
 - SMTP settings for email-based admin 2FA: `EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS=True`, and `DEFAULT_FROM_EMAIL`. The console email backend is for local development and does not deliver email from production.
 - `ADMIN_2FA_EMAIL_SENDER`: sender address used by the admin 2FA package.
 
-The build script generates `frontend/config.js` using `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`, so the public catalogue URL points to `catalogue/products.json` in your own Supabase bucket. On Vercel, the frontend uses same-origin rewrites for its Django API fallback. If Supabase URL is not configured at build time, the frontend falls back to the Django API; set the variable and redeploy to use the published JSON snapshot.
+- The build script generates `frontend/config.js` using `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`, so the public catalogue URL points to `catalogue/products.json` in your own Supabase bucket. It also runs `collectstatic` and copies collected Django Admin assets into `frontend/static/`, because Vercel serves static files from the configured output directory. On Vercel, the frontend uses same-origin rewrites for its Django API fallback. If Supabase URL is not configured at build time, the frontend falls back to the Django API; set the variable and redeploy to use the published JSON snapshot.
 
 ### One-time Supabase setup before first production use
 

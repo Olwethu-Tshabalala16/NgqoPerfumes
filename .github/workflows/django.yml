@@ -42,6 +42,11 @@ jobs:
           DJANGO_DEBUG: "True"
         run: python scripts/build_vercel.py
 
+      - name: Verify Django Admin static assets are included in Vercel output
+        run: |
+          test -f frontend/static/admin/css/base.css
+          test -f frontend/static/admin/nqo-admin.css
+
       - name: Check frontend JavaScript syntax
         run: |
           node --check frontend/app.js

@@ -2,6 +2,7 @@ import json
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -121,3 +122,21 @@ class CataloguePublishingTests(TestCase):
 
         with self.assertRaises(ImproperlyConfigured):
             publish_catalogue()
+
+
+
+class AdminDashboardTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.admin_user = user_model.objects.create_superuser(
+            username="nqo-admin",
+            email="admin@example.com",
+            password="test-only-password-123",
+        )
+        self.client.force_login(self.admin_user)
+
+    def test_admin_dashboard_renders(self):
+        response = self.client.get(reverse("admin:index"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Nqo Perfumes")

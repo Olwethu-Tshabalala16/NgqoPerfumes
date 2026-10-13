@@ -12,7 +12,7 @@ from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent.parent / ".env")
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-change-me")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY") or "dev-only-change-me"
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 
 if os.getenv("VERCEL") and SECRET_KEY == "dev-only-change-me":
@@ -119,7 +119,7 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Vercel terminates HTTPS at its edge proxy.
@@ -136,6 +136,30 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "admin@example.com")
+
+# Email-based Admin 2FA must deliver real messages in production. The console
+# backend is useful locally but would silently send OTPs only to function logs.
+if os.getenv("VERCEL"):
+    if EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend":
+        raise ImproperlyConfigured(
+            "Configure a real EMAIL_BACKEND for production Admin 2FA; "
+            "the console email backend cannot deliver login codes."
+        )
+    if EMAIL_BACKEND == "django.core.mail.backends.smtp.EmailBackend":
+        missing_smtp_settings = [
+            name
+            for name, value in (
+                ("EMAIL_HOST", EMAIL_HOST),
+                ("EMAIL_HOST_USER", EMAIL_HOST_USER),
+                ("EMAIL_HOST_PASSWORD", EMAIL_HOST_PASSWORD),
+            )
+            if not value
+        ]
+        if missing_smtp_settings:
+            raise ImproperlyConfigured(
+                "Configure these SMTP environment variables in Vercel: "
+                + ", ".join(missing_smtp_settings)
+            )
 
 ADMIN_2FA_ENABLE_EMAIL_OTP = True
 ADMIN_2FA_EMAIL_SENDER = os.getenv(
