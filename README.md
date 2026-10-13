@@ -112,7 +112,7 @@ catalogue/products.json
 
 When an administrator adds, edits or deletes a product in Django Admin, the backend serializes the full current product list and overwrites that one fixed JSON object. This avoids creating a new JSON filename for each edit. The image bytes remain separate objects in Supabase Storage; each JSON record includes the corresponding public `image_url`. Product names, descriptions, prices and stock values are not stored in the image files themselves.
 
-For production, set `CATALOGUE_JSON_URL` in `frontend/config.js` to the public URL for that JSON object, using this format:
+During a Vercel build, `scripts/build_vercel.py` generates `frontend/config.js` from `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`. Do not manually edit the generated deployment configuration; the checked-in `frontend/config.js` is the local-development default. The production catalogue URL follows this format:
 
 ```text
 https://PROJECT_REF.supabase.co/storage/v1/object/public/product-images/catalogue/products.json
