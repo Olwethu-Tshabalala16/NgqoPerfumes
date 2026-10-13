@@ -168,7 +168,7 @@ Keep the database password available for the database connection setup. Do not p
 The example in `.env.example` uses this general format:
 
 ```env
-DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@POOLER_HOST:5432/postgres
+DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@POOLER_HOST:6543/postgres
 ```
 
 This is a template, not a working connection string. Use the exact host, port, username, and database name provided by Supabase. URL-encode special characters in the password if required by the connection-string format.
