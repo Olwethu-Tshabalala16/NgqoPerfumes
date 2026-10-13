@@ -43,7 +43,7 @@
                 {% if entry.is_deletion or not entry.get_admin_url %}
                     {{ entry.object_repr }}
                 {% else %}
-                    <a href="{{ entry.get_admin_url }}">{{ entry.object_repr|to_object_display_value }}</a>
+                    <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
                 {% endif %}
                 <br>
                 {% if entry.content_type %}
