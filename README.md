@@ -270,7 +270,7 @@ Add these environment variables in Vercel for **Production** and any Preview env
 - SMTP settings for email-based admin 2FA: `EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS=True`, and `DEFAULT_FROM_EMAIL`. The console email backend is for local development and does not deliver email from production.
 - `ADMIN_2FA_EMAIL_SENDER`: sender address used by the admin 2FA package.
 
-The build script generates `frontend/config.js` using `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`, so the public catalogue URL points to `catalogue/products.json` in your own Supabase bucket. On Vercel, the frontend uses same-origin rewrites for its Django API fallback. If Supabase URL is not configured at build time, the frontend falls back to the Django API; set the variable and redeploy to use the published JSON snapshot.
+- The build script generates `frontend/config.js` using `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`, so the public catalogue URL points to `catalogue/products.json` in your own Supabase bucket. It also runs `collectstatic` and copies collected Django Admin assets into `frontend/static/`, because Vercel serves static files from the configured output directory. On Vercel, the frontend uses same-origin rewrites for its Django API fallback. If Supabase URL is not configured at build time, the frontend falls back to the Django API; set the variable and redeploy to use the published JSON snapshot.
 
 ### One-time Supabase setup before first production use
 
