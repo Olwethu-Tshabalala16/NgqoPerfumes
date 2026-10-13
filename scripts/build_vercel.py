@@ -1,6 +1,7 @@
 """Build the Vercel static frontend and collect Django admin assets."""
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -33,3 +34,11 @@ subprocess.run(
     cwd=BACKEND,
     check=True,
 )
+
+# Vercel serves files from the configured output directory, not Django's
+# STATIC_ROOT. Copy collected admin assets into the frontend output so that
+# /static/admin/... URLs work without invoking a Python function for each asset.
+STATIC_OUTPUT = ROOT / "frontend" / "static"
+if STATIC_OUTPUT.exists():
+    shutil.rmtree(STATIC_OUTPUT)
+shutil.copytree(BACKEND / "staticfiles", STATIC_OUTPUT)
