@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load i18n static admin_filters %}
+{% load i18n static %}
 
 {% block coltype %}colMS{% endblock %}
 {% block bodyclass %}{{ block.super }} dashboard{% endblock %}
@@ -41,7 +41,7 @@
             <li class="{% if entry.is_addition %}addlink{% endif %}{% if entry.is_change %}changelink{% endif %}{% if entry.is_deletion %}deletelink{% endif %}">
                 <span class="visually-hidden">{% if entry.is_addition %}{% translate 'Added:' %}{% elif entry.is_change %}{% translate 'Changed:' %}{% elif entry.is_deletion %}{% translate 'Deleted:' %}{% endif %}</span>
                 {% if entry.is_deletion or not entry.get_admin_url %}
-                    {{ entry.object_repr|to_object_display_value }}
+                    {{ entry.object_repr }}
                 {% else %}
                     <a href="{{ entry.get_admin_url }}">{{ entry.object_repr|to_object_display_value }}</a>
                 {% endif %}
