@@ -20,7 +20,7 @@ This project is therefore more than a practice e-commerce application. It starte
 - Publishes the full product catalogue as a JSON file in Supabase Storage whenever an admin adds, edits or deletes a product.
 - Uses Supabase Storage's S3-compatible API for persistent product images; the JSON catalogue stores each image's public URL.
 - Loads the customer-facing catalogue directly from that persistent Supabase JSON file in production, so a website redeployment does not remove the catalogue.
-- Includes two-factor authentication support for the admin area.
+- Uses standard Django Admin username-and-password login. Email delivery and two-factor authentication are deferred and disabled for the initial deployment.
 - Serves the backend with Gunicorn and backend static assets with WhiteNoise.
 ## Architecture
 
@@ -64,7 +64,7 @@ Frontend (HTML, CSS, JavaScript) -----------------+
 | Pillow | Image processing |
 | Gunicorn | WSGI application server |
 | WhiteNoise | Backend static-file serving |
-| Django Admin / Admin 2FA | Product management and additional authentication security |
+| Django Admin | Product management |
 ## Supabase PostgreSQL
 
 The application uses the `DATABASE_URL` environment variable to connect Django's ORM to the Supabase PostgreSQL database.
@@ -140,7 +140,6 @@ SUPABASE_STORAGE_REGION=your-project-region
 SUPABASE_STORAGE_ACCESS_KEY_ID=your-storage-access-key
 SUPABASE_STORAGE_SECRET_ACCESS_KEY=your-storage-secret
 
-ADMIN_2FA_EMAIL_SENDER=admin@example.com
 ```
 
 Never commit `.env`.
@@ -207,7 +206,7 @@ Open `.env` and replace the example values with values from your own Supabase pr
 | `DJANGO_DEBUG` | Use `True` for local development only; set it to `False` in production. |
 | `DJANGO_ALLOWED_HOSTS` | Comma-separated hostnames allowed to serve the application. Set these to your actual local or deployment hosts. |
 | `CSRF_TRUSTED_ORIGINS` | Include the full trusted origins required by your deployment, including the scheme such as `https://`, if applicable. |
-| `ADMIN_2FA_EMAIL_SENDER` | The sender address used by the admin two-factor-authentication configuration. Configure any required email settings for your deployment as well. |
+| Email and Admin 2FA settings | Not required for the initial deployment. Email delivery and two-factor authentication are intentionally disabled; configure these later when implementing the feature. |
 
 The `.env.example` file documents the variable names expected by this repository. Keep your real credentials in `.env` or in your hosting provider's environment-variable settings.
 
@@ -248,7 +247,7 @@ Changing the environment variables connects NqoPerfumes to a different backend; 
 
 ## Deploying on Vercel with Supabase
 
-This repository is configured for **Vercel** hosting: Vercel serves the static customer-facing frontend from `frontend/` and routes the Django API, Admin and Admin 2FA endpoints to the Python function in `api/index.py`. Supabase is the persistent PostgreSQL database and object storage provider. Do not deploy the Django backend to a filesystem-based host that discards local writes.
+This repository is configured for **Vercel** hosting: Vercel serves the static customer-facing frontend from `frontend/` and routes the Django API and Admin endpoints to the Python function in `api/index.py`. Supabase is the persistent PostgreSQL database and object storage provider. Do not deploy the Django backend to a filesystem-based host that discards local writes.
 
 ### Required Vercel project settings
 
@@ -267,8 +266,7 @@ Add these environment variables in Vercel for **Production** and any Preview env
 - `SUPABASE_URL`: your actual Supabase project URL, for example `https://YOUR_PROJECT_REF.supabase.co`.
 - `SUPABASE_STORAGE_BUCKET=product-images`.
 - `SUPABASE_STORAGE_ENDPOINT`, `SUPABASE_STORAGE_REGION`, `SUPABASE_STORAGE_ACCESS_KEY_ID`, and `SUPABASE_STORAGE_SECRET_ACCESS_KEY`: the S3-compatible Storage settings from your Supabase project. Keep access keys and secrets server-side only.
-- SMTP settings for email-based admin 2FA: `EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS=True`, and `DEFAULT_FROM_EMAIL`. The console email backend is for local development and does not deliver email from production.
-- `ADMIN_2FA_EMAIL_SENDER`: sender address used by the admin 2FA package.
+- Email delivery and Admin 2FA are intentionally disabled for the initial deployment. Do not add SMTP variables now; the related configuration can be restored when the feature is implemented later.
 
 - The build script generates `frontend/config.js` using `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`, so the public catalogue URL points to `catalogue/products.json` in your own Supabase bucket. It also runs `collectstatic` and copies collected Django Admin assets into `frontend/static/`, because Vercel serves static files from the configured output directory. On Vercel, the frontend uses same-origin rewrites for its Django API fallback. If Supabase URL is not configured at build time, the frontend falls back to the Django API; set the variable and redeploy to use the published JSON snapshot.
 

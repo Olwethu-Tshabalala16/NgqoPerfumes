@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     "corsheaders",
     "store",
     "storages",
-    "django_admin_2fa_plus",
 ]
 
 MIDDLEWARE = [
@@ -137,31 +136,11 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "admin@example.com")
 
-# Email-based Admin 2FA must deliver real messages in production. The console
-# backend is useful locally but would silently send OTPs only to function logs.
-if os.getenv("VERCEL"):
-    if EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend":
-        raise ImproperlyConfigured(
-            "Configure a real EMAIL_BACKEND for production Admin 2FA; "
-            "the console email backend cannot deliver login codes."
-        )
-    if EMAIL_BACKEND == "django.core.mail.backends.smtp.EmailBackend":
-        missing_smtp_settings = [
-            name
-            for name, value in (
-                ("EMAIL_HOST", EMAIL_HOST),
-                ("EMAIL_HOST_USER", EMAIL_HOST_USER),
-                ("EMAIL_HOST_PASSWORD", EMAIL_HOST_PASSWORD),
-            )
-            if not value
-        ]
-        if missing_smtp_settings:
-            raise ImproperlyConfigured(
-                "Configure these SMTP environment variables in Vercel: "
-                + ", ".join(missing_smtp_settings)
-            )
-
-ADMIN_2FA_ENABLE_EMAIL_OTP = True
+# Email delivery and Admin 2FA are intentionally inactive for the initial
+# deployment. Keep these settings for later, when SMTP and 2FA are implemented.
+# Do not make production startup depend on email credentials while the feature
+# is not in use.
+ADMIN_2FA_ENABLE_EMAIL_OTP = False
 ADMIN_2FA_EMAIL_SENDER = os.getenv(
     "ADMIN_2FA_EMAIL_SENDER",
     "admin@example.com",
