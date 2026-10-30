@@ -26,21 +26,76 @@ if ON_VERCEL and not IS_VERCEL_BUILD and SECRET_KEY == "dev-only-change-me":
         "Missing DJANGO_SECRET_KEY. Add it to the Vercel project's Environment Variables."
     )
 
-_default_hosts = ".vercel.app,localhost,127.0.0.1" if ON_VERCEL else "localhost,127.0.0.1"
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.getenv("DJANGO_ALLOWED_HOSTS", _default_hosts).split(",")
-    if host.strip()
-]
+def _csv_values(value):
+    """Split a comma-separated environment variable into clean values."""
+    return [item.strip() for item in (value or "").split(",") if item.strip()]
 
-_default_csrf_origins = "https://*.vercel.app" if ON_VERCEL else ""
-CSRF_TRUSTED_ORIGINS = [
-    origin.strip().rstrip("/")
-    for origin in os.getenv(
-        "CSRF_TRUSTED_ORIGINS", _default_csrf_origins
-    ).split(",")
-    if origin.strip()
+
+def _host_from_value(value):
+    """Accept either a hostname or a URL and return its hostname only."""
+    from urllib.parse import urlsplit
+
+    value = value.strip()
+    if not value:
+        return ""
+    parsed = urlsplit(value if "://" in value else f"//{value}")
+    return (parsed.hostname or "").lower()
+
+
+# A Vercel deployment can have a unique URL, a branch URL and a production
+# alias. Include all runtime-provided hostnames as well as configured custom
+# domains. Do not let an empty/incomplete DJANGO_ALLOWED_HOSTS setting erase
+# the Vercel defaults (the usual cause of Django's DisallowedHost HTTP 400).
+configured_hosts = [
+    host
+    for host in (
+        _host_from_value(value)
+        for value in _csv_values(os.getenv("DJANGO_ALLOWED_HOSTS"))
+    )
+    if host
 ]
+vercel_hosts = []
+if ON_VERCEL:
+    vercel_hosts = [
+        host
+        for host in (
+            _host_from_value(os.getenv(name, ""))
+            for name in (
+                "VERCEL_URL",
+                "VERCEL_BRANCH_URL",
+                "VERCEL_PROJECT_PRODUCTION_URL",
+            )
+        )
+        if host
+    ]
+
+default_hosts = ["localhost", "127.0.0.1"]
+if ON_VERCEL:
+    default_hosts.append(".vercel.app")
+
+ALLOWED_HOSTS = list(
+    dict.fromkeys(default_hosts + configured_hosts + vercel_hosts)
+)
+
+# CSRF trusted origins are additive too. Django requires full origins (with
+# scheme), while ALLOWED_HOSTS contains hostnames only.
+configured_csrf_origins = [
+    origin.rstrip("/")
+    for origin in _csv_values(os.getenv("CSRF_TRUSTED_ORIGINS"))
+]
+csrf_host_origins = []
+for host in ALLOWED_HOSTS:
+    if host == "*":
+        continue
+    origin_host = f"*{host}" if host.startswith(".") else host
+    csrf_host_origins.append(f"https://{origin_host}")
+
+if ON_VERCEL:
+    csrf_host_origins.append("https://*.vercel.app")
+
+CSRF_TRUSTED_ORIGINS = list(
+    dict.fromkeys(configured_csrf_origins + csrf_host_origins)
+)
 
 CORS_ALLOWED_ORIGINS = [
     origin.strip().rstrip("/")
