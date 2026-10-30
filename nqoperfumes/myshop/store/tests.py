@@ -190,3 +190,9 @@ class VercelDeploymentTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+    def test_wsgi_configuration_uses_importable_repository_root_shim(self):
+        from django.conf import settings
+        import vercel_wsgi
+
+        self.assertEqual(settings.WSGI_APPLICATION, "vercel_wsgi.application")
+        self.assertTrue(callable(vercel_wsgi.application))

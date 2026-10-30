@@ -247,7 +247,7 @@ Changing the environment variables connects NqoPerfumes to a different backend; 
 
 ## Deploying NqoPerfumes on Vercel
 
-This repository uses Vercel's native Django integration. Vercel detects the Django project from its nested `manage.py` file and loads the WSGI callable configured in the root `pyproject.toml`. The customer catalogue is served by Django at `/`; CSS, JavaScript and Django Admin assets are collected from Django's static-file configuration and served through Vercel's CDN.
+This repository uses Vercel's native Django integration. Vercel detects the Django project from the repository-root `manage.py` file and loads the WSGI callable configured in the root `pyproject.toml`. The customer catalogue is served by Django at `/`; CSS, JavaScript and Django Admin assets are collected from Django's static-file configuration and served through Vercel's CDN.
 
 The old custom `api/index.py` function and manual rewrites are no longer used. Do not restore an `outputDirectory` override pointing at `frontend`: that would bypass the native Django deployment.
 
@@ -259,9 +259,9 @@ Use these settings in **Project → Settings → Build & Development Settings**:
 - **Framework Preset:** Django, or Auto Detect if Django is not offered in the menu. Do not force the project to `Other`.
 - **Build Command:** `python scripts/build_vercel.py`. The same command is declared in `pyproject.toml`.
 - **Output Directory:** leave the override disabled / blank. Do not set it to `frontend`.
-- **Install Command:** leave the default so Vercel installs from the root `requirements.txt`.
+- **Install Command:** leave the default so Vercel installs the dependencies declared in the root `pyproject.toml`. The root `requirements.txt` is kept in sync for local development and CI.
 
-The root `manage.py` lets Vercel detect the Django project, and `pyproject.toml` points the native runtime to the root `vercel_wsgi:application` shim. The small build script only generates the public `frontend/config.js`; Vercel's Django integration runs `collectstatic` itself. No manual rewrite rules are required.
+The root `manage.py` lets Vercel detect the Django project. The `[project].dependencies` list in `pyproject.toml` is the dependency manifest Vercel reads; `requirements.txt` mirrors that list. CI checks that both lists remain identical. The `[tool.vercel]` section points the native runtime to the root `vercel_wsgi:application` shim. The small build script only generates the public `frontend/config.js`; Vercel's Django integration runs `collectstatic` itself. No manual rewrite rules are required.
 
 ### Environment variables
 
@@ -282,12 +282,12 @@ The application returns a descriptive HTTP 503 JSON response if a Vercel request
 
 ### Deploy and verify
 
-1. Make sure the latest changes from branch `fix/vercel-deployment-hardening` are present in the branch you intend to deploy.
+1. Confirm the latest deployment is using the `main` branch.
 2. In Vercel, open the NqoPerfumes project and check that the Root Directory is the repository root.
 3. Remove any old Build & Development overrides for Output Directory (especially `frontend`) and make sure the Framework Preset is Django / Auto Detect.
 4. Add the production and preview environment variables listed above, then save.
-5. Open **Deployments**, choose **Redeploy** for a deployment built from the latest branch commit, or create a new deployment from `fix/vercel-deployment-hardening`. Do not redeploy an older commit.
-6. Confirm the deployment's source commit is the latest commit on that branch and that the build logs show Django's static collection completing successfully.
+5. Trigger a new deployment from the latest `main` commit; do not redeploy an older commit.
+6. Confirm the deployment's source commit matches the latest `main` commit and that the build logs show Django's dependencies installed and static collection completing successfully.
 7. Test these routes:
    - `/` — customer-facing perfume catalogue.
    - `/static/styles.css` — customer-facing stylesheet.

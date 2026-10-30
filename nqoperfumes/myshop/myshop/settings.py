@@ -147,7 +147,10 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "myshop.wsgi.application"
+# Vercel resolves this module from the repository root. The root shim adds the
+# nested Django project to sys.path before importing myshop.wsgi.application.
+# The nested manage.py also adds the repository root for local runserver use.
+WSGI_APPLICATION = "vercel_wsgi.application"
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 

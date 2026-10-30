@@ -1,12 +1,21 @@
 #!/usr/bin/env python
 """Django's command-line utility for administrative tasks."""
+
 import os
 import sys
+from pathlib import Path
+
+# The WSGI shim lives at the repository root. Add that root when this nested
+# manage.py is used locally so runserver can import the same WSGI entrypoint
+# that Vercel uses in production.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myshop.settings')
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "myshop.settings")
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
@@ -18,5 +27,5 @@ def main():
     execute_from_command_line(sys.argv)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
