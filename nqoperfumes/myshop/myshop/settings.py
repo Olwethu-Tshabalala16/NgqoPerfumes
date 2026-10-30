@@ -12,24 +12,33 @@ from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent.parent / ".env")
 
+ON_VERCEL = bool(os.getenv("VERCEL"))
+IS_VERCEL_BUILD = os.getenv("NQO_BUILD") == "1"
+
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY") or "dev-only-change-me"
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 
-if os.getenv("VERCEL") and SECRET_KEY == "dev-only-change-me":
-    raise ImproperlyConfigured("Set a unique DJANGO_SECRET_KEY in Vercel environment variables.")
+# Vercel runs collectstatic during the build, before runtime-only secrets may
+# be available. Enforce production secrets in api/index.py at function startup,
+# not while Django is collecting static files.
+if ON_VERCEL and not IS_VERCEL_BUILD and SECRET_KEY == "dev-only-change-me":
+    raise ImproperlyConfigured(
+        "Missing DJANGO_SECRET_KEY. Add it to the Vercel project's Environment Variables."
+    )
 
+_default_hosts = ".vercel.app,localhost,127.0.0.1" if ON_VERCEL else "localhost,127.0.0.1"
 ALLOWED_HOSTS = [
     host.strip()
-    for host in os.getenv(
-        "DJANGO_ALLOWED_HOSTS",
-        "localhost,127.0.0.1",
-    ).split(",")
+    for host in os.getenv("DJANGO_ALLOWED_HOSTS", _default_hosts).split(",")
     if host.strip()
 ]
 
+_default_csrf_origins = "https://*.vercel.app" if ON_VERCEL else ""
 CSRF_TRUSTED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    origin.strip().rstrip("/")
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS", _default_csrf_origins
+    ).split(",")
     if origin.strip()
 ]
 
@@ -85,18 +94,25 @@ WSGI_APPLICATION = "myshop.wsgi.application"
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Vercel instances are ephemeral: never silently fall back to SQLite in production.
-if os.getenv("VERCEL") and not DATABASE_URL:
-    raise ImproperlyConfigured("Set DATABASE_URL to your Supabase PostgreSQL connection string in Vercel.")
+# During collectstatic, SQLite is only a harmless settings fallback; no
+# database connection or migration is performed. The deployed function refuses
+# to start without the real persistent PostgreSQL URL.
+if ON_VERCEL and not IS_VERCEL_BUILD and not DATABASE_URL:
+    raise ImproperlyConfigured(
+        "Missing DATABASE_URL. Add your Supabase PostgreSQL connection string to Vercel."
+    )
 
 if DATABASE_URL:
     DATABASES = {
-        "default": dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=0,
-            conn_health_checks=True,
-            ssl_require=True,
-        )
+        "default": {
+            **dj_database_url.parse(
+                DATABASE_URL,
+                conn_max_age=0,
+                conn_health_checks=True,
+                ssl_require=True,
+            ),
+            "CONN_MAX_AGE": 0,
+        }
     }
 else:
     DATABASES = {
@@ -136,10 +152,7 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "admin@example.com")
 
-# Email delivery and Admin 2FA are intentionally inactive for the initial
-# deployment. Keep these settings for later, when SMTP and 2FA are implemented.
-# Do not make production startup depend on email credentials while the feature
-# is not in use.
+# Email delivery and Admin 2FA remain disabled for the initial deployment.
 ADMIN_2FA_ENABLE_EMAIL_OTP = False
 ADMIN_2FA_EMAIL_SENDER = os.getenv(
     "ADMIN_2FA_EMAIL_SENDER",
