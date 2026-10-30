@@ -1,16 +1,21 @@
 """
 WSGI config for myshop project.
 
-It exposes the WSGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/6.1/howto/deployment/wsgi/
+Vercel's native Django runtime loads this callable directly. Add the Django
+project directory to Python's import path because manage.py lives one level
+above the myshop package inside nqoperfumes/myshop/.
 """
 
 import os
+import sys
+from pathlib import Path
 
-from django.core.wsgi import get_wsgi_application
+DJANGO_PROJECT = Path(__file__).resolve().parent.parent
+if str(DJANGO_PROJECT) not in sys.path:
+    sys.path.insert(0, str(DJANGO_PROJECT))
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myshop.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "myshop.settings")
+
+from django.core.wsgi import get_wsgi_application  # noqa: E402
 
 application = get_wsgi_application()
