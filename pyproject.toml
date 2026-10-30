@@ -1,7 +1,7 @@
 [tool.vercel]
-# Native Vercel Django deployment. The manage.py file lives under
-# nqoperfumes/myshop/, and this is the project's WSGI callable.
-entrypoint = "nqoperfumes/myshop/myshop/wsgi.py:application"
+# Vercel detects Django through the repository-root manage.py. This shim adds
+# the nested project directory to sys.path and exposes the WSGI callable.
+entrypoint = "vercel_wsgi:application"
 
 [tool.vercel.scripts]
 # Generate only the public frontend configuration here. Vercel's Django
