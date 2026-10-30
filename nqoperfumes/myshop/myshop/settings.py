@@ -7,25 +7,26 @@ from pathlib import Path
 
 import dj_database_url
 from dotenv import load_dotenv
-from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR.parent.parent / ".env")
+REPOSITORY_ROOT = BASE_DIR.parents[1]
+FRONTEND_DIR = REPOSITORY_ROOT / "frontend"
+load_dotenv(REPOSITORY_ROOT / ".env")
 
-ON_VERCEL = bool(os.getenv("VERCEL"))
-IS_VERCEL_BUILD = os.getenv("NQO_BUILD") == "1"
+# Vercel exposes these system variables to its Python runtime. Checking more
+# than one keeps this true whether the generic VERCEL flag or deployment URL
+# is the available signal.
+ON_VERCEL = any(
+    os.getenv(name)
+    for name in ("VERCEL", "VERCEL_URL", "VERCEL_ENV")
+)
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY") or "dev-only-change-me"
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 
-# Vercel runs collectstatic during the build, before runtime-only secrets may
-# be available. Enforce production secrets in api/index.py at function startup,
-# not while Django is collecting static files.
-if ON_VERCEL and not IS_VERCEL_BUILD and SECRET_KEY == "dev-only-change-me":
-    raise ImproperlyConfigured(
-        "Missing DJANGO_SECRET_KEY. Add it to the Vercel project's Environment Variables."
-    )
-
+# Vercel imports Django while building and collecting static assets. Required
+# production secrets are checked by RequireVercelConfigurationMiddleware on
+# incoming requests, not during application import.
 def _csv_values(value):
     """Split a comma-separated environment variable into clean values."""
     return [item.strip() for item in (value or "").split(",") if item.strip()]
@@ -117,6 +118,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "store.middleware.RequireVercelConfigurationMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -133,7 +135,7 @@ ROOT_URLCONF = "myshop.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
+        "DIRS": [BASE_DIR / "templates", FRONTEND_DIR],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -149,14 +151,9 @@ WSGI_APPLICATION = "myshop.wsgi.application"
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# During collectstatic, SQLite is only a harmless settings fallback; no
-# database connection or migration is performed. The deployed function refuses
-# to start without the real persistent PostgreSQL URL.
-if ON_VERCEL and not IS_VERCEL_BUILD and not DATABASE_URL:
-    raise ImproperlyConfigured(
-        "Missing DATABASE_URL. Add your Supabase PostgreSQL connection string to Vercel."
-    )
-
+# SQLite remains a local-development fallback only. On Vercel, the first
+# middleware rejects requests until DATABASE_URL is configured, preventing
+# data from being written to an ephemeral database.
 if DATABASE_URL:
     DATABASES = {
         "default": {
@@ -191,6 +188,9 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# The customer-facing catalogue is also a Django template. Its CSS and JS are
+# collected from frontend/ and served by Vercel's static CDN at /static/.
+STATICFILES_DIRS = [FRONTEND_DIR]
 
 # Vercel terminates HTTPS at its edge proxy.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
