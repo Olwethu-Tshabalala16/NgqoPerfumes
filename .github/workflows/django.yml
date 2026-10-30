@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - "fix/**"
       - "refactor/**"
   pull_request:
 
@@ -36,22 +37,33 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Validate Vercel build command
+      - name: Validate Vercel frontend build command and deployment configuration
         env:
           DJANGO_SECRET_KEY: ci-only-secret-key
           DJANGO_DEBUG: "True"
-        run: python scripts/build_vercel.py
-
-      - name: Verify Django Admin static assets are included in Vercel output
         run: |
-          test -f frontend/static/admin/css/base.css
-          test -f frontend/static/admin/nqo-admin.css
+          python scripts/build_vercel.py
+          python -c "import json, pathlib, tomllib; json.loads(pathlib.Path('vercel.json').read_text()); data=tomllib.loads(pathlib.Path('pyproject.toml').read_text()); assert data['tool']['vercel']['entrypoint'] == 'vercel_wsgi:application'"
 
-      - name: Check frontend JavaScript syntax
+      - name: Verify Django and customer static assets are collected
+        working-directory: nqoperfumes/myshop
+        env:
+          DJANGO_SECRET_KEY: ci-only-secret-key
+          DJANGO_DEBUG: "True"
+        run: |
+          python manage.py collectstatic --noinput
+          test -f staticfiles/admin/css/base.css
+          test -f staticfiles/admin/nqo-admin.css
+          test -f staticfiles/styles.css
+          test -f staticfiles/app.js
+          test -f staticfiles/config.js
+
+      - name: Check frontend and Python syntax
         run: |
           node --check frontend/app.js
           node --check frontend/config.js
-          python -m py_compile api/index.py scripts/build_vercel.py
+          python -m py_compile manage.py vercel_wsgi.py scripts/build_vercel.py
+          python -m py_compile nqoperfumes/myshop/myshop/wsgi.py nqoperfumes/myshop/store/middleware.py
 
       - name: Run automated tests
         working-directory: nqoperfumes/myshop
