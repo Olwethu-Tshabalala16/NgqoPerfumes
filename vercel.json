@@ -1,36 +1,8 @@
 {
-  "version": 2,
-  "buildCommand": "python scripts/build_vercel.py",
-  "outputDirectory": "frontend",
-  "rewrites": [
-    {
-      "source": "/api",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/admin",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/admin/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/admin-2fa",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/admin-2fa/(.*)",
-      "destination": "/api/index.py"
-    }
-  ],
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/index.py": {
-      "maxDuration": 30
+    "nqoperfumes/myshop/myshop/wsgi.py": {
+      "maxDuration": 60
     }
   }
 }
