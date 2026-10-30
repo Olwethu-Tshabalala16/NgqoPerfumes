@@ -14,17 +14,17 @@ This project is therefore more than a practice e-commerce application. It starte
 
 ## What the Application Does
 
-- Displays a searchable fragrance catalogue in a standalone frontend.
+- Displays a searchable fragrance catalogue using a Django-served HTML template with plain CSS and JavaScript assets.
 - Exposes product names, descriptions, prices, stock quantities and image URLs through a JSON API.
 - Allows product records and images to be managed through Django Admin.
 - Publishes the full product catalogue as a JSON file in Supabase Storage whenever an admin adds, edits or deletes a product.
 - Uses Supabase Storage's S3-compatible API for persistent product images; the JSON catalogue stores each image's public URL.
 - Loads the customer-facing catalogue directly from that persistent Supabase JSON file in production, so a website redeployment does not remove the catalogue.
 - Uses standard Django Admin username-and-password login. Email delivery and two-factor authentication are deferred and disabled for the initial deployment.
-- Serves the backend with Gunicorn and backend static assets with WhiteNoise.
+- Runs Django through Vercel's native Python runtime in production and Django's development server locally; Vercel's CDN serves collected static assets.
 ## Architecture
 
-The customer-facing frontend and Django backend are separate applications. The frontend uses plain HTML, CSS and JavaScript and communicates with the backend over HTTP using JSON.
+The customer-facing catalogue is a plain HTML, CSS and JavaScript interface served by Django. It uses the same-origin JSON API, while Django Admin manages product records and persistent media.
 
 ```text
 Admin (Django Admin)
@@ -62,7 +62,7 @@ Frontend (HTML, CSS, JavaScript) -----------------+
 | django-cors-headers | Configurable cross-origin access for the frontend |
 | python-dotenv | Load local environment variables from `.env` |
 | Pillow | Image processing |
-| Gunicorn | WSGI application server |
+| Gunicorn | Optional WSGI application server for non-Vercel deployments |
 | WhiteNoise | Backend static-file serving |
 | Django Admin | Product management |
 ## Supabase PostgreSQL
@@ -261,7 +261,7 @@ Use these settings in **Project → Settings → Build & Development Settings**:
 - **Output Directory:** leave the override disabled / blank. Do not set it to `frontend`.
 - **Install Command:** leave the default so Vercel installs from the root `requirements.txt`.
 
-The root `pyproject.toml` points Vercel to `nqoperfumes/myshop/myshop/wsgi.py:application`. The small build script only generates the public `frontend/config.js`; Vercel's Django integration runs `collectstatic` itself. No manual rewrite rules are required.
+The root `manage.py` lets Vercel detect the Django project, and `pyproject.toml` points the native runtime to the root `vercel_wsgi:application` shim. The small build script only generates the public `frontend/config.js`; Vercel's Django integration runs `collectstatic` itself. No manual rewrite rules are required.
 
 ### Environment variables
 
