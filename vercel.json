@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "nqoperfumes/myshop/myshop/wsgi.py": {
+    "vercel_wsgi.py": {
       "maxDuration": 60
     }
   }
