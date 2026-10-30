@@ -70,9 +70,10 @@ if ON_VERCEL:
         if host
     ]
 
-default_hosts = ["localhost", "127.0.0.1"]
-if ON_VERCEL:
-    default_hosts.append(".vercel.app")
+# This project is deployed on Vercel, so its generated and branch deployment
+# URLs must be accepted even when Vercel's optional system-variable exposure
+# is disabled in the dashboard.
+default_hosts = ["localhost", "127.0.0.1", ".vercel.app"]
 
 ALLOWED_HOSTS = list(
     dict.fromkeys(default_hosts + configured_hosts + vercel_hosts)
@@ -91,8 +92,7 @@ for host in ALLOWED_HOSTS:
     origin_host = f"*{host}" if host.startswith(".") else host
     csrf_host_origins.append(f"https://{origin_host}")
 
-if ON_VERCEL:
-    csrf_host_origins.append("https://*.vercel.app")
+csrf_host_origins.append("https://*.vercel.app")
 
 CSRF_TRUSTED_ORIGINS = list(
     dict.fromkeys(configured_csrf_origins + csrf_host_origins)
