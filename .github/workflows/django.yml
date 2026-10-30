@@ -43,7 +43,26 @@ jobs:
           DJANGO_DEBUG: "True"
         run: |
           python scripts/build_vercel.py
-          python -c "import json, pathlib, tomllib; json.loads(pathlib.Path('vercel.json').read_text()); data=tomllib.loads(pathlib.Path('pyproject.toml').read_text()); assert data['tool']['vercel']['entrypoint'] == 'vercel_wsgi:application'"
+          python - <<'PY'
+          import json
+          import pathlib
+          import tomllib
+
+          json.loads(pathlib.Path("vercel.json").read_text())
+          data = tomllib.loads(pathlib.Path("pyproject.toml").read_text())
+          assert data["tool"]["vercel"]["entrypoint"] == "vercel_wsgi:application"
+          assert data["project"]["requires-python"] == ">=3.13,<3.14"
+
+          pyproject_dependencies = data["project"]["dependencies"]
+          requirements_dependencies = [
+              line.strip()
+              for line in pathlib.Path("requirements.txt").read_text().splitlines()
+              if line.strip() and not line.lstrip().startswith("#")
+          ]
+          assert pyproject_dependencies == requirements_dependencies, (
+              "pyproject.toml dependencies must match requirements.txt exactly"
+          )
+          PY
 
       - name: Verify Django and customer static assets are collected
         working-directory: nqoperfumes/myshop
