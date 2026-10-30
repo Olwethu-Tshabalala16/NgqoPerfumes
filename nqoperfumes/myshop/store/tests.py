@@ -140,3 +140,53 @@ class AdminDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Nqo Perfumes")
+
+
+class VercelDeploymentTests(TestCase):
+    def test_homepage_serves_catalogue_html(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ngqo Perfumes")
+        self.assertContains(response, "/static/styles.css")
+
+    def test_vercel_reports_missing_runtime_configuration_as_503(self):
+        import os
+
+        from unittest.mock import patch
+
+        with patch.dict(
+            os.environ,
+            {
+                "VERCEL": "1",
+                "DJANGO_SECRET_KEY": "",
+                "DATABASE_URL": "",
+            },
+        ):
+            response = self.client.get("/api/health/")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json()["missing_environment_variables"],
+            ["DJANGO_SECRET_KEY", "DATABASE_URL"],
+        )
+
+    def test_vercel_request_passes_when_required_configuration_exists(self):
+        import os
+
+        from unittest.mock import patch
+
+        with patch.dict(
+            os.environ,
+            {
+                "VERCEL": "1",
+                "DJANGO_SECRET_KEY": "test-secret-key",
+                "DATABASE_URL": (
+                    "postgresql://test:test@localhost:5432/testdb"
+                ),
+            },
+        ):
+            response = self.client.get("/api/health/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})

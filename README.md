@@ -14,17 +14,17 @@ This project is therefore more than a practice e-commerce application. It starte
 
 ## What the Application Does
 
-- Displays a searchable fragrance catalogue in a standalone frontend.
+- Displays a searchable fragrance catalogue using a Django-served HTML template with plain CSS and JavaScript assets.
 - Exposes product names, descriptions, prices, stock quantities and image URLs through a JSON API.
 - Allows product records and images to be managed through Django Admin.
 - Publishes the full product catalogue as a JSON file in Supabase Storage whenever an admin adds, edits or deletes a product.
 - Uses Supabase Storage's S3-compatible API for persistent product images; the JSON catalogue stores each image's public URL.
 - Loads the customer-facing catalogue directly from that persistent Supabase JSON file in production, so a website redeployment does not remove the catalogue.
 - Uses standard Django Admin username-and-password login. Email delivery and two-factor authentication are deferred and disabled for the initial deployment.
-- Serves the backend with Gunicorn and backend static assets with WhiteNoise.
+- Runs Django through Vercel's native Python runtime in production and Django's development server locally; Vercel's CDN serves collected static assets.
 ## Architecture
 
-The customer-facing frontend and Django backend are separate applications. The frontend uses plain HTML, CSS and JavaScript and communicates with the backend over HTTP using JSON.
+The customer-facing catalogue is a plain HTML, CSS and JavaScript interface served by Django. It uses the same-origin JSON API, while Django Admin manages product records and persistent media.
 
 ```text
 Admin (Django Admin)
@@ -62,7 +62,7 @@ Frontend (HTML, CSS, JavaScript) -----------------+
 | django-cors-headers | Configurable cross-origin access for the frontend |
 | python-dotenv | Load local environment variables from `.env` |
 | Pillow | Image processing |
-| Gunicorn | WSGI application server |
+| Gunicorn | Optional WSGI application server for non-Vercel deployments |
 | WhiteNoise | Backend static-file serving |
 | Django Admin | Product management |
 ## Supabase PostgreSQL
@@ -245,47 +245,59 @@ If database access works but image uploads fail, check the Storage endpoint, reg
 Changing the environment variables connects NqoPerfumes to a different backend; it does **not** migrate existing data. If you are moving an existing catalogue, export and import the database records and separately copy the image files to the new bucket. Check image paths and URLs after migration.
 
 
-## Deploying on Vercel with Supabase
+## Deploying NqoPerfumes on Vercel
 
-This repository is configured for **Vercel** hosting: Vercel serves the static customer-facing frontend from `frontend/` and routes the Django API and Admin endpoints to the Python function in `api/index.py`. Supabase is the persistent PostgreSQL database and object storage provider. Do not deploy the Django backend to a filesystem-based host that discards local writes.
+This repository uses Vercel's native Django integration. Vercel detects the Django project from its nested `manage.py` file and loads the WSGI callable configured in the root `pyproject.toml`. The customer catalogue is served by Django at `/`; CSS, JavaScript and Django Admin assets are collected from Django's static-file configuration and served through Vercel's CDN.
 
-### Required Vercel project settings
+The old custom `api/index.py` function and manual rewrites are no longer used. Do not restore an `outputDirectory` override pointing at `frontend`: that would bypass the native Django deployment.
 
-- **Root Directory:** repository root (leave blank/default).
-- **Build Command:** `python scripts/build_vercel.py` (also defined in `vercel.json`).
-- **Output Directory:** `frontend` (also defined in `vercel.json`).
-- **Install Command:** leave the default; Vercel installs dependencies from the root `requirements.txt`.
+### Vercel project settings
 
-Add these environment variables in Vercel for **Production** and any Preview environment you intend to use:
+Use these settings in **Project → Settings → Build & Development Settings**:
 
-- `DJANGO_SECRET_KEY`: a long, unique random secret.
+- **Root Directory:** repository root (leave it as `./`; do not select `frontend/` or `nqoperfumes/myshop/`).
+- **Framework Preset:** Django, or Auto Detect if Django is not offered in the menu. Do not force the project to `Other`.
+- **Build Command:** `python scripts/build_vercel.py`. The same command is declared in `pyproject.toml`.
+- **Output Directory:** leave the override disabled / blank. Do not set it to `frontend`.
+- **Install Command:** leave the default so Vercel installs from the root `requirements.txt`.
+
+The root `manage.py` lets Vercel detect the Django project, and `pyproject.toml` points the native runtime to the root `vercel_wsgi:application` shim. The small build script only generates the public `frontend/config.js`; Vercel's Django integration runs `collectstatic` itself. No manual rewrite rules are required.
+
+### Environment variables
+
+Add the following in **Project → Settings → Environment Variables** for both **Production** and **Preview** (or at least for the environment in which you are testing):
+
+- `DJANGO_SECRET_KEY`: a long, unique random secret. Do not use the development fallback.
 - `DJANGO_DEBUG=False`.
-- `DJANGO_ALLOWED_HOSTS=.vercel.app,your-custom-domain.example` (replace the custom-domain example if applicable; `.vercel.app` allows Vercel deployment hostnames).
-- `CSRF_TRUSTED_ORIGINS=https://your-project.vercel.app,https://your-custom-domain.example` (use the actual HTTPS origins; do not include a trailing slash).
-- `DATABASE_URL`: Supabase PostgreSQL connection string. Use the connection mode Supabase recommends for your Vercel deployment and URL-encode special characters in the password.
+- `DATABASE_URL`: Supabase PostgreSQL connection string. Use the transaction pooler when recommended for serverless deployments, and URL-encode special characters in the password.
+- `DJANGO_ALLOWED_HOSTS`: optional comma-separated custom hostnames. The application already allows Vercel's `.vercel.app` hostnames. For a custom domain, add its hostname without `https://`, for example `shop.example.com`.
+- `CSRF_TRUSTED_ORIGINS`: optional comma-separated full origins for custom domains, including the scheme, for example `https://shop.example.com`. Vercel origins are included by default.
 - `SUPABASE_URL`: your actual Supabase project URL, for example `https://YOUR_PROJECT_REF.supabase.co`.
 - `SUPABASE_STORAGE_BUCKET=product-images`.
-- `SUPABASE_STORAGE_ENDPOINT`, `SUPABASE_STORAGE_REGION`, `SUPABASE_STORAGE_ACCESS_KEY_ID`, and `SUPABASE_STORAGE_SECRET_ACCESS_KEY`: the S3-compatible Storage settings from your Supabase project. Keep access keys and secrets server-side only.
-- Email delivery and Admin 2FA are intentionally disabled for the initial deployment. Do not add SMTP variables now; the related configuration can be restored when the feature is implemented later.
+- `SUPABASE_STORAGE_ENDPOINT`, `SUPABASE_STORAGE_REGION`, `SUPABASE_STORAGE_ACCESS_KEY_ID`, and `SUPABASE_STORAGE_SECRET_ACCESS_KEY`: the S3-compatible Storage settings from Supabase. Keep the access key and secret on the server only.
 
-- The build script generates `frontend/config.js` using `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`, so the public catalogue URL points to `catalogue/products.json` in your own Supabase bucket. It also runs `collectstatic` and copies collected Django Admin assets into `frontend/static/`, because Vercel serves static files from the configured output directory. On Vercel, the frontend uses same-origin rewrites for its Django API fallback. If Supabase URL is not configured at build time, the frontend falls back to the Django API; set the variable and redeploy to use the published JSON snapshot.
+Email delivery and Admin 2FA are intentionally disabled for the initial deployment. SMTP credentials are not required.
 
-### One-time Supabase setup before first production use
+The application returns a descriptive HTTP 503 JSON response if a Vercel request arrives before `DJANGO_SECRET_KEY` or `DATABASE_URL` is configured. It does not silently use an ephemeral SQLite database in production.
 
-1. Create the Supabase project and a public Storage bucket named `product-images`.
-2. Generate S3-compatible Storage credentials and add them as Vercel environment variables. The public bucket permits catalogue visitors to read product images and the JSON snapshot; it does not make the secret upload credentials public.
-3. Configure `DATABASE_URL` and all other variables before the first Vercel deployment. Production settings deliberately reject a missing database URL rather than silently using ephemeral SQLite.
-4. From a trusted local environment with the production environment variables loaded, run `python manage.py migrate` and `python manage.py createsuperuser` from `nqoperfumes/myshop/`. These commands must point at your Supabase database. Do not commit the local database or production credentials.
-5. Deploy from the repository root on Vercel. The build script collects Django Admin static assets and generates the frontend configuration.
-6. Open `https://YOUR_PROJECT.vercel.app/admin/`, sign in, and create a test product with an image. Verify that the product row exists in Supabase PostgreSQL, the image appears under `products/` in the `product-images` bucket, and `catalogue/products.json` is publicly readable. The Admin should report whether catalogue publishing succeeded.
-7. Verify `/api/health/` returns JSON with `status: ok` and the public frontend displays the test product. Delete the test product after verification if it is not intended for customers.
+### Deploy and verify
 
-### Important deployment limits
+1. Make sure the latest changes from branch `fix/vercel-deployment-hardening` are present in the branch you intend to deploy.
+2. In Vercel, open the NqoPerfumes project and check that the Root Directory is the repository root.
+3. Remove any old Build & Development overrides for Output Directory (especially `frontend`) and make sure the Framework Preset is Django / Auto Detect.
+4. Add the production and preview environment variables listed above, then save.
+5. Open **Deployments**, choose **Redeploy** for a deployment built from the latest branch commit, or create a new deployment from `fix/vercel-deployment-hardening`. Do not redeploy an older commit.
+6. Confirm the deployment's source commit is the latest commit on that branch and that the build logs show Django's static collection completing successfully.
+7. Test these routes:
+   - `/` — customer-facing perfume catalogue.
+   - `/static/styles.css` — customer-facing stylesheet.
+   - `/api/health/` — JSON health response.
+   - `/api/products/` — product catalogue API.
+   - `/admin/` — Django Admin login.
 
-- Vercel's filesystem is not persistent. Product images must be stored in Supabase Storage, not a local `media/` folder, and product data must use Supabase PostgreSQL, not SQLite.
-- Migrations and superuser creation are deliberate one-time/manual operations; they are not run automatically during each deployment.
-- This repository does not contain your Supabase credentials and cannot configure the Supabase project or Vercel environment variables on your behalf. The deployment is not live until those real values are added and the end-to-end upload/read test passes.
-- Never put Supabase Storage secrets, database passwords, SMTP passwords or the Django secret key in `frontend/config.js`, browser code, Git history or screenshots.
+Before the first production use, apply database migrations and create the admin user against the Supabase database from a trusted local environment with the production environment variables loaded. Run `python manage.py migrate` and `python manage.py createsuperuser` from `nqoperfumes/myshop/`. Do not run migrations automatically on every Vercel request.
+
+Vercel's function filesystem is ephemeral. Product images must remain in Supabase Storage and structured product data must remain in Supabase PostgreSQL. Never commit `.env`, database passwords, storage secrets or the Django secret key.
 
 ## Running Locally
 
@@ -319,16 +331,16 @@ The backend API is available at:
 
 For local development, the default `.env.example` CORS origins allow a frontend served on port 5500.
 
-### 2. Run the separate frontend
+### 2. Run the customer-facing site locally
 
-Open a second terminal from the repository root:
+The customer frontend is now served by Django, with its CSS and JavaScript loaded from `/static/`. Start the backend from the Django project directory:
 
 ```bash
-cd frontend
-python -m http.server 5500
+cd nqoperfumes/myshop
+python manage.py runserver
 ```
 
-Open `http://127.0.0.1:5500` in your browser. The frontend's `config.js` points to the local Django API by default. When deploying, change `API_BASE_URL` to the public backend origin, or use an empty string when frontend and backend share the same origin. Add the deployed frontend origin to `CORS_ALLOWED_ORIGINS` on the backend.
+Open `http://127.0.0.1:8000/` to view the perfume catalogue. The local frontend uses the same-origin API at `/api/products/`; no separate static HTTP server is needed.
 
 ### 3. Run the backend tests
 

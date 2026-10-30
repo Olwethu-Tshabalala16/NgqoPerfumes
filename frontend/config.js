@@ -1,9 +1,9 @@
 /*
- * Set CATALOGUE_JSON_URL to the public URL of catalogue/products.json in your
- * Supabase Storage bucket for deployments. Leave it empty only for local
- * development, where the frontend falls back to the Django JSON API.
+ * The frontend and Django API share one origin in production and when using
+ * Django's runserver locally. A build may populate CATALOGUE_JSON_URL to read
+ * the published Supabase catalogue snapshot directly.
  */
 window.NQO_CONFIG = {
   CATALOGUE_JSON_URL: "",
-  API_BASE_URL: "http://127.0.0.1:8000"
+  API_BASE_URL: ""
 };

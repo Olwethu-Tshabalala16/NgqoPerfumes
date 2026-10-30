@@ -1,0 +1,9 @@
+[tool.vercel]
+# Vercel detects Django through the repository-root manage.py. This shim adds
+# the nested project directory to sys.path and exposes the WSGI callable.
+entrypoint = "vercel_wsgi:application"
+
+[tool.vercel.scripts]
+# Generate only the public frontend configuration here. Vercel's Django
+# integration runs collectstatic and serves the collected assets via its CDN.
+build = "python scripts/build_vercel.py"
