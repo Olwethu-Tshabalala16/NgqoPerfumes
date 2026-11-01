@@ -21,6 +21,7 @@ This project is therefore more than a practice e-commerce application. It starte
 - Uses Supabase Storage's S3-compatible API for persistent product images; the JSON catalogue stores each image's public URL.
 - Loads the customer-facing catalogue directly from that persistent Supabase JSON file in production, so a website redeployment does not remove the catalogue.
 - Uses standard Django Admin username-and-password login. Email delivery and two-factor authentication are deferred and disabled for the initial deployment.
+- Provides a light/dark theme toggle on the storefront and Django Admin. The theme follows the visitor's device setting by default and remembers manual selections.
 - Runs Django through Vercel's native Python runtime in production and Django's development server locally; Vercel's CDN serves collected static assets.
 ## Architecture
 
@@ -275,6 +276,8 @@ Add the following in **Project → Settings → Environment Variables** for both
 - `SUPABASE_URL`: your actual Supabase project URL, for example `https://YOUR_PROJECT_REF.supabase.co`.
 - `SUPABASE_STORAGE_BUCKET=product-images`.
 - `SUPABASE_STORAGE_ENDPOINT`, `SUPABASE_STORAGE_REGION`, `SUPABASE_STORAGE_ACCESS_KEY_ID`, and `SUPABASE_STORAGE_SECRET_ACCESS_KEY`: the S3-compatible Storage settings from Supabase. Keep the access key and secret on the server only.
+- `SITE_THEME`: optional `light` or `dark` default theme for visitors who have not chosen one.
+- `SITE_THEME_LOCK=1`: optional setting that locks the selected `SITE_THEME` for all visitors.
 
 Email delivery and Admin 2FA are intentionally disabled for the initial deployment. SMTP credentials are not required.
 
