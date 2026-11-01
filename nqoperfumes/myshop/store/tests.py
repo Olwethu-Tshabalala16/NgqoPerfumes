@@ -140,6 +140,8 @@ class AdminDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Nqo Perfumes")
+        self.assertContains(response, 'data-theme-toggle')
+        self.assertRegex(response.content.decode(), r"/static/theme(?:\.[a-zA-Z0-9]+)?\.js")
 
 
 class VercelDeploymentTests(TestCase):
@@ -149,6 +151,28 @@ class VercelDeploymentTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Ngqo Perfumes")
         self.assertContains(response, "/static/styles.css")
+        self.assertContains(response, 'data-theme-toggle')
+        self.assertContains(response, '/static/theme.js')
+
+    def test_theme_cookie_selects_theme_for_first_page_render(self):
+        self.client.cookies["theme"] = "dark"
+
+        response = self.client.get("/")
+
+        self.assertContains(response, '<html lang="en" data-theme="dark">', html=False)
+
+    def test_locked_owner_theme_overrides_visitor_choice(self):
+        import os
+
+        with patch.dict(
+            os.environ,
+            {"SITE_THEME": "dark", "SITE_THEME_LOCK": "1"},
+        ):
+            self.client.cookies["theme"] = "light"
+            response = self.client.get("/")
+
+        self.assertContains(response, 'data-theme="dark"', html=False)
+        self.assertContains(response, 'data-theme-locked="true" disabled', html=False)
 
     def test_vercel_reports_missing_runtime_configuration_as_503(self):
         import os

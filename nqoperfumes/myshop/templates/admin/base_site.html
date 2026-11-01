@@ -1,8 +1,35 @@
 {% extends "admin/base.html" %}
 {% load static %}
 {% block title %}Nqo Perfumes Administration{% endblock %}
+{% block dark-mode-vars %}
+<script>
+  (() => {
+    const theme = "{{ site_theme|default:''|escapejs }}";
+    if (theme) document.documentElement.dataset.theme = theme;
+    if ({{ site_theme_locked|yesno:"true,false" }}) {
+      document.documentElement.dataset.themeLocked = "true";
+    }
+  })();
+</script>
+<script src="{% static 'theme.js' %}" defer></script>
+{% endblock %}
 {% block extrastyle %}{{ block.super }}
 <link rel="stylesheet" href="{% static 'admin/nqo-admin.css' %}">
 {% endblock %}
-{% block branding %}<div class="nqo-branding"><span class="nqo-brand-mark" aria-hidden="true">N</span><div><div class="nqo-brand-name">Nqo Perfumes</div><div class="nqo-brand-subtitle">Administration</div></div></div>{% endblock %}
+{% block branding %}
+<div class="nqo-branding">
+  <div class="nqo-theme-controls">
+    <button class="nqo-theme-toggle" type="button" data-theme-toggle
+            {% if site_theme_locked %}data-theme-locked="true" disabled{% endif %}
+            aria-pressed="false" aria-label="Switch to dark mode">
+      <span data-theme-icon aria-hidden="true">☾</span>
+    </button>
+    <button class="nqo-theme-reset" type="button" data-theme-reset hidden>
+      Use device setting
+    </button>
+  </div>
+  <span class="nqo-brand-mark" aria-hidden="true">N</span>
+  <div><div class="nqo-brand-name">Nqo Perfumes</div><div class="nqo-brand-subtitle">Administration</div></div>
+</div>
+{% endblock %}
 {% block nav-global %}<div class="nqo-admin-nav-note" aria-label="Administration guidance"><span>Manage your catalogue</span><span class="nqo-nav-dot" aria-hidden="true">•</span><span>Update products and images safely</span></div>{% endblock %}

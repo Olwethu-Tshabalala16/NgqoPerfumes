@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en"{% if site_theme %} data-theme="{{ site_theme }}"{% endif %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,14 +8,27 @@
   <title>Ngqo Perfumes | Fragrance Catalogue</title>
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/config.js"></script>
+  <script src="/static/theme.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="./" aria-label="Ngqo Perfumes home">
+    <div class="header-brand-group">
+      <div class="theme-controls">
+        <button class="theme-toggle" type="button" data-theme-toggle
+                {% if site_theme_locked %}data-theme-locked="true" disabled{% endif %}
+                aria-pressed="false" aria-label="Switch to dark mode">
+          <span data-theme-icon aria-hidden="true">☾</span>
+        </button>
+        <button class="theme-reset" type="button" data-theme-reset hidden>
+          Use device setting
+        </button>
+      </div>
+      <a class="brand" href="./" aria-label="Ngqo Perfumes home">
       <span class="brand-mark" aria-hidden="true">N</span>
       <span class="brand-name">NGQO <span>PERFUMES</span></span>
-    </a>
+      </a>
+    </div>
     <a class="header-link" href="#catalogue">Explore the catalogue <span aria-hidden="true">↗</span></a>
   </header>
 
