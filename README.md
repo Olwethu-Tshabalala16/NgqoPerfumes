@@ -1,398 +1,414 @@
 # NqoPerfumes
 
-A Django-based digital perfume catalogue built from a real family business problem.
+A Django-powered digital fragrance catalogue built to solve a real problem for a small family perfume business.
 
-## Why I Built This
+<p align="center">
+  <a href="https://ngqoperfumes.vercel.app"><strong>Live application</strong></a>
+  ·
+  <a href="https://github.com/Olwethu-Tshabalala16/NqoPerfumes"><strong>Source code</strong></a>
+</p>
 
-Before building this project, my mother ran a small perfume side business using printed catalogues. She would receive or share a catalogue, show customers the available perfumes, and use that catalogue to take orders.
+NqoPerfumes replaces a manually shared product catalogue with a single, shareable website. Customers can browse fragrances, search the collection, view product details, prices, availability and product images. Product information is managed through Django Admin, while Supabase provides persistent database and object-storage infrastructure.
 
-When I started learning web development, I realised I could solve a practical problem for her: instead of repeatedly sharing a physical catalogue or individual product pictures, she could share a single link to an online catalogue.
+> **Project status:** Deployed on Vercel. The current scope is a product catalogue with administrative product management; it is not yet a complete e-commerce checkout or payment platform.
 
-Customers can open the catalogue, browse the available perfumes, view product information and images, and use the website as a central reference when deciding what they want to order.
+---
 
-This project is therefore more than a practice e-commerce application. It started from a real problem in my own environment and became one of the projects through which I learned how a web application can be connected to cloud infrastructure.
+## Table of contents
 
-## What the Application Does
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Technology stack](#technology-stack)
+- [Repository structure](#repository-structure)
+- [Data model and catalogue format](#data-model-and-catalogue-format)
+- [Run locally](#run-locally)
+- [Environment variables](#environment-variables)
+- [Database and storage setup](#database-and-storage-setup)
+- [Tests and continuous integration](#tests-and-continuous-integration)
+- [Deploy to Vercel](#deploy-to-vercel)
+- [Operational notes](#operational-notes)
+- [Security considerations](#security-considerations)
+- [Engineering decisions and learning](#engineering-decisions-and-learning)
+- [Roadmap](#roadmap)
 
-- Displays a searchable fragrance catalogue using a Django-served HTML template with plain CSS and JavaScript assets.
-- Exposes product names, descriptions, prices, stock quantities and image URLs through a JSON API.
-- Allows product records and images to be managed through Django Admin.
-- Publishes the full product catalogue as a JSON file in Supabase Storage whenever an admin adds, edits or deletes a product.
-- Uses Supabase Storage's S3-compatible API for persistent product images; the JSON catalogue stores each image's public URL.
-- Loads the customer-facing catalogue directly from that persistent Supabase JSON file in production, so a website redeployment does not remove the catalogue.
-- Uses standard Django Admin username-and-password login. Email delivery and two-factor authentication are deferred and disabled for the initial deployment.
-- Provides a light/dark theme toggle on the storefront and Django Admin. The theme follows the visitor's device setting by default and remembers manual selections.
-- Runs Django through Vercel's native Python runtime in production and Django's development server locally; Vercel's CDN serves collected static assets.
+## Overview
+
+The project began with a practical problem. My mother was running a small perfume business and relied on printed or manually shared catalogues to show customers the available products. I built NqoPerfumes to make that catalogue accessible through one link.
+
+The application has since developed into a small full-stack system. It combines a Django application, a relational database, object storage, a static customer-facing interface and a deployment pipeline.
+
+The project is useful as a demonstration of how a relatively small business requirement can lead to real engineering concerns: data persistence, file storage, API design, deployment configuration, cache invalidation and consistency between an administrative system and a public-facing catalogue.
+
+## Features
+
+### Customer-facing catalogue
+
+- Responsive fragrance catalogue built with HTML, CSS and vanilla JavaScript.
+- Search products by name and description.
+- Open a product detail dialog to view its description, price, image and stock status.
+- Display prices in South African rand (ZAR).
+- Lazy-load product images.
+- Light and dark theme support, including remembered visitor preferences.
+- Display a useful empty state and retry option when catalogue data cannot be loaded.
+
+### Product administration
+
+- Django Admin is used to create, update, search and delete products.
+- Product records include a name, description, price, stock quantity and optional image.
+- Saving or deleting a product republishes the complete catalogue to a fixed JSON object in Supabase Storage.
+- Bulk deletion through Django Admin also republishes the catalogue.
+- Product image cleanup checks whether another product still references the same image before deleting it.
+
+### Backend and infrastructure
+
+- Django serves the customer-facing page, admin interface and JSON API.
+- PostgreSQL stores structured application data.
+- Supabase Storage stores product images and the generated catalogue snapshot.
+- The frontend reads the public JSON catalogue in production and falls back to the Django products API if that source is unavailable.
+- Catalogue responses are configured to avoid stale browser and CDN cache results.
+- Vercel deploys the Django application and serves collected static assets.
+- GitHub Actions runs Django checks, tests, frontend syntax checks and deployment-configuration validation.
+
 ## Architecture
 
-The customer-facing catalogue is a plain HTML, CSS and JavaScript interface served by Django. It uses the same-origin JSON API, while Django Admin manages product records and persistent media.
+The application separates structured product data from image files and the public catalogue snapshot.
+
+```mermaid
+flowchart TD
+    Admin[Store administrator] -->|Create, update or delete| Django[Django application]
+    Django -->|ORM reads and writes| DB[(Supabase PostgreSQL)]
+    Django -->|Upload / delete image| Storage[(Supabase Storage)]
+    Django -->|Serialize full product list| JSON[ catalogue/products.json ]
+    JSON -->|Public JSON fetch| Browser[Customer browser]
+    Storage -->|Public image URLs| Browser
+    Browser -->|Fallback GET| API[GET /api/products/]
+    API --> Django
+    Browser -->|HTML, CSS and JavaScript| Vercel[Vercel deployment]
+```
+
+### Catalogue publishing flow
+
+1. An administrator creates, edits or deletes a product in Django Admin.
+2. Django persists the product change in PostgreSQL.
+3. The admin integration builds a fresh snapshot of all current products.
+4. Django overwrites the single object at `catalogue/products.json` in Supabase Storage.
+5. The storefront fetches that JSON snapshot and renders the current catalogue.
+6. If the JSON source cannot be loaded, the frontend attempts the Django products API.
+
+The catalogue JSON is a generated read model for the storefront. PostgreSQL remains the structured source of truth for product records.
+
+### Product image lifecycle
+
+Images are stored separately from the JSON catalogue. When a product is deleted, a Django `post_delete` signal checks whether another product references the same image. It removes the image only when no remaining product uses it. If remote image deletion fails, the database deletion is not rolled back; the failure is written to the application log for investigation.
+
+## Technology stack
+
+| Layer | Technology | Responsibility |
+|---|---|---|
+| Backend | Python 3.13 | Application language |
+| Web framework | Django 6.1 | Routing, ORM, admin and server-side application |
+| Database | PostgreSQL | Persistent product and application records |
+| Object storage | Supabase Storage (S3-compatible API) | Product images and catalogue JSON |
+| Frontend | HTML5, CSS3, vanilla JavaScript | Customer-facing catalogue |
+| Storage integration | django-storages, boto3 | Django file storage through the S3-compatible interface |
+| Database configuration | dj-database-url, psycopg2 | PostgreSQL connection configuration |
+| Static assets | WhiteNoise / Vercel static delivery | Static-file handling |
+| Hosting | Vercel | Django deployment and static asset delivery |
+| CI | GitHub Actions | Automated checks and tests |
+
+## Repository structure
 
 ```text
-Admin (Django Admin)
-        |
-        | save/edit/delete product
-        v
-Django backend (Python) ---- uploads image ----> Supabase Storage
-        |                                         | product-images/products/...
-        | serializes all products                 | catalogue/products.json
-        +---------------------------------------->|
-                                                  ^
-                                                  | fetch public JSON
-Frontend (HTML, CSS, JavaScript) -----------------+
+NqoPerfumes/
+├── .github/
+│   └── workflows/
+│       └── django.yml             # CI checks and automated tests
+├── frontend/
+│   ├── app.js                     # Catalogue rendering, search and API fallback
+│   ├── config.js                  # Generated public frontend configuration
+│   ├── index.html                 # Customer-facing page template
+│   ├── styles.css                 # Storefront styles
+│   └── theme.js                   # Theme preferences
+├── nqoperfumes/
+│   └── myshop/
+│       ├── myshop/
+│       │   ├── settings.py        # Django and infrastructure configuration
+│       │   └── urls.py            # Application routes
+│       ├── store/
+│       │   ├── admin.py           # Product administration and catalogue publishing
+│       │   ├── catalogue.py       # Catalogue JSON generation and publishing
+│       │   ├── models.py          # Product model
+│       │   ├── signals.py         # Unreferenced image cleanup
+│       │   ├── storage.py         # Supabase S3-compatible storage backend
+│       │   ├── tests.py           # Backend tests
+│       │   ├── urls.py            # Store API routes
+│       │   └── views.py           # Product API and health endpoint
+│       └── manage.py
+├── scripts/
+│   └── build_vercel.py            # Generates public frontend configuration
+├── .env.example                   # Environment variable template
+├── manage.py                      # Repository-root Django entry point
+├── pyproject.toml                 # Python dependencies and Vercel configuration
+├── requirements.txt               # Pinned dependencies for pip and CI
+├── vercel.json                    # Vercel function configuration
+└── vercel_wsgi.py                 # WSGI entry point for Vercel
 ```
 
-- `frontend/` contains the customer-facing catalogue and does not contain database or storage credentials.
-- `nqoperfumes/myshop/` contains Django settings, the product model, API endpoints and Django Admin.
-- Saving, editing or deleting a product in Django Admin republishes the complete catalogue to the fixed Supabase Storage object `catalogue/products.json`.
-- Each JSON product record includes its name, description, price, stock, availability, image URL and timestamps.
-- Product image files are stored separately in the `product-images` bucket under `products/`; the JSON catalogue points to those durable public image URLs.
-- The frontend reads the public JSON object directly when `CATALOGUE_JSON_URL` is configured. The Django `GET /api/products/` endpoint remains available as a local-development fallback, and `GET /api/health/` provides a lightweight health check.
-- Supabase PostgreSQL remains the Django admin's structured product database; Supabase Storage is the persistent, redeployment-independent catalogue and image store.
-- CORS is restricted to origins explicitly configured with `CORS_ALLOWED_ORIGINS`.
-## Technology Stack
+## Data model and catalogue format
 
-| Technology | Purpose |
-|---|---|
-| Python | Backend programming language |
-| Django 6.1 | Backend framework, ORM and administration |
-| Django JSON views | Lightweight read-only catalogue API |
-| HTML, CSS and JavaScript | Independent customer-facing frontend |
-| PostgreSQL | Persistent application database |
-| Supabase | Managed PostgreSQL and object storage platform |
-| django-storages / boto3 | S3-compatible product image storage |
-| django-cors-headers | Configurable cross-origin access for the frontend |
-| python-dotenv | Load local environment variables from `.env` |
-| Pillow | Image processing |
-| Gunicorn | Optional WSGI application server for non-Vercel deployments |
-| WhiteNoise | Backend static-file serving |
-| Django Admin | Product management |
-## Supabase PostgreSQL
+The core domain model is `Product`.
 
-The application uses the `DATABASE_URL` environment variable to connect Django's ORM to the Supabase PostgreSQL database.
+| Field | Type | Purpose |
+|---|---|---|
+| `id` | Integer primary key | Product identifier |
+| `name` | Character field | Fragrance name |
+| `description` | Text field | Product description |
+| `price` | Decimal | Product price |
+| `stock` | Positive integer | Available stock quantity |
+| `image` | Image field | Optional product image stored in Supabase |
+| `created_at` | Date/time | Record creation timestamp |
+| `updated_at` | Date/time | Last record update timestamp |
 
-For a serverless deployment such as Vercel, use the Supabase **transaction pooler** connection string. Supabase documents transaction pooling for serverless functions and shared session pooling for IPv4-compatible persistent connections.
+The generated catalogue is a JSON document with a version, update timestamp, product count and product collection. Each product entry includes its identifier, name, description, price, stock, stock availability, image URL and timestamps.
 
-The database password must remain in environment variables and must never be committed to Git.
+Example response shape:
 
-## Supabase Storage
-
-Create a public file bucket named:
-
-```text
-product-images
+```json
+{
+  "version": 1,
+  "updated_at": "2026-01-01T12:00:00+00:00",
+  "count": 1,
+  "products": [
+    {
+      "id": 1,
+      "name": "Example fragrance",
+      "description": "Product description",
+      "price": "499.00",
+      "stock": 5,
+      "is_in_stock": true,
+      "image_url": "https://<project>.supabase.co/storage/v1/object/public/<bucket>/products/example.jpg",
+      "created_at": "2026-01-01T10:00:00+00:00",
+      "updated_at": "2026-01-01T10:00:00+00:00"
+    }
+  ]
+}
 ```
 
-The application uses Supabase Storage's S3-compatible endpoint.
+The values above are illustrative, not live product data.
 
-Required environment variables:
+## Run locally
 
-```env
-SUPABASE_URL=https://PROJECT_REF.supabase.co
-SUPABASE_STORAGE_BUCKET=product-images
-SUPABASE_STORAGE_ENDPOINT=https://PROJECT_REF.storage.supabase.co/storage/v1/s3
-SUPABASE_STORAGE_REGION=PROJECT_REGION
-SUPABASE_STORAGE_ACCESS_KEY_ID=your-storage-s3-access-key
-SUPABASE_STORAGE_SECRET_ACCESS_KEY=your-storage-s3-secret
-```
+### Prerequisites
 
-The S3 access key and secret are **server-side credentials**. They must only be configured in local environment variables or the deployment platform's secret/environment-variable settings.
+- Python 3.13
+- pip
+- Git
+- A Supabase project if you want to test PostgreSQL and remote image/catalogue storage
 
-The application generates public image URLs in the following form:
-
-```text
-https://PROJECT_REF.supabase.co/storage/v1/object/public/product-images/products/...
-```
-
-### Persistent JSON catalogue
-
-The same public `product-images` bucket also stores the generated catalogue at:
-
-```text
-catalogue/products.json
-```
-
-When an administrator adds, edits or deletes a product in Django Admin, the backend serializes the full current product list and overwrites that one fixed JSON object. This avoids creating a new JSON filename for each edit. The image bytes remain separate objects in Supabase Storage; each JSON record includes the corresponding public `image_url`. Product names, descriptions, prices and stock values are not stored in the image files themselves.
-
-During a Vercel build, `scripts/build_vercel.py` generates `frontend/config.js` from `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`. Do not manually edit the generated deployment configuration; the checked-in `frontend/config.js` is the local-development default. The production catalogue URL follows this format:
-
-```text
-https://PROJECT_REF.supabase.co/storage/v1/object/public/product-images/catalogue/products.json
-```
-
-Do not leave `CATALOGUE_JSON_URL` empty in production: an empty value makes the frontend use the Django API fallback instead of reading the persistent JSON snapshot directly. After configuring Supabase, save a product in Django Admin to publish the initial catalogue. The admin shows a success message when publishing succeeds and an error message if the JSON upload fails.
-
-## Environment Configuration
-
-Copy `.env.example` to a local `.env` file and replace the placeholders with your actual Supabase and Django configuration.
-
-Required configuration includes:
-
-```env
-DJANGO_SECRET_KEY=your-secret-key
-DJANGO_DEBUG=True
-DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
-
-DATABASE_URL=your-supabase-postgresql-connection-string
-
-SUPABASE_URL=https://PROJECT_REF.supabase.co
-SUPABASE_STORAGE_BUCKET=product-images
-SUPABASE_STORAGE_ENDPOINT=https://PROJECT_REF.storage.supabase.co/storage/v1/s3
-SUPABASE_STORAGE_REGION=your-project-region
-SUPABASE_STORAGE_ACCESS_KEY_ID=your-storage-access-key
-SUPABASE_STORAGE_SECRET_ACCESS_KEY=your-storage-secret
-
-```
-
-Never commit `.env`.
-
-## Configure NqoPerfumes With Your Own Supabase Project
-
-Follow this section when setting up your own copy of NqoPerfumes. You need to configure **two separate Supabase services**: PostgreSQL for product data and Storage for product images. Creating a Supabase project alone does not configure the Django application automatically.
-
-### 1. Create a Supabase project
-
-1. Sign in at [Supabase](https://supabase.com/) and create a new project.
-2. Choose a project name and region.
-3. Set a strong database password and store it securely.
-4. Wait until the project has finished provisioning.
-
-Keep the database password available for the database connection setup. Do not put it in source code or commit it to Git.
-
-### 2. Get the PostgreSQL connection string
-
-1. Open your Supabase project and select **Connect** (or the database connection settings).
-2. Copy a PostgreSQL connection string suitable for your hosting environment.
-3. For a serverless deployment, use the **transaction pooler** connection details recommended by Supabase. For a persistent local connection, use a connection option supported by your network and hosting environment.
-4. Replace the placeholders in `DATABASE_URL` with the actual connection details.
-
-The example in `.env.example` uses this general format:
-
-```env
-DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@POOLER_HOST:6543/postgres
-```
-
-This is a template, not a working connection string. Use the exact host, port, username, and database name provided by Supabase. URL-encode special characters in the password if required by the connection-string format.
-
-### 3. Create the product image bucket
-
-1. In your Supabase project, open **Storage**.
-2. Create a bucket named `product-images`.
-3. Configure it as a **public bucket** if you want product images to load using the public URLs generated by this project.
-4. In the Supabase Storage S3 connection settings, obtain an S3 access key and secret for server-side use.
-
-The application stores product images under the `products/` path within this bucket. The bucket name must match `SUPABASE_STORAGE_BUCKET` in your environment.
-
-The bucket being public allows visitors to download product images; it does **not** mean that S3 secret credentials should be public. Keep upload credentials on the Django server only. Do not put them in frontend JavaScript or commit them to GitHub.
-
-### 4. Configure your local environment
-
-From the repository root, copy the example environment file:
+### 1. Clone the repository
 
 ```bash
-cp .env.example .env
+git clone https://github.com/Olwethu-Tshabalala16/NqoPerfumes.git
+cd NqoPerfumes
 ```
 
-Open `.env` and replace the example values with values from your own Supabase project. The important variables are:
+### 2. Create and activate a virtual environment
 
-| Variable | Where to get it / what it controls |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string from Supabase's **Connect** or database connection settings. |
-| `SUPABASE_URL` | Project URL shown in the Supabase project settings; it normally has the form `https://PROJECT_REF.supabase.co`. |
-| `SUPABASE_STORAGE_BUCKET` | The Storage bucket name; use `product-images` unless you also change the application configuration. |
-| `SUPABASE_STORAGE_ENDPOINT` | The S3-compatible Storage endpoint for your project, normally `https://PROJECT_REF.storage.supabase.co/storage/v1/s3`. Use the endpoint shown by Supabase if it differs. |
-| `SUPABASE_STORAGE_REGION` | The region value required by the S3-compatible Storage configuration for your project. |
-| `SUPABASE_STORAGE_ACCESS_KEY_ID` | The S3 access key generated in Supabase Storage settings. |
-| `SUPABASE_STORAGE_SECRET_ACCESS_KEY` | The secret paired with that S3 access key. Treat it as a password. |
-| `DJANGO_SECRET_KEY` | A new, unique Django secret key for your environment. Do not reuse a public example value in production. |
-| `DJANGO_DEBUG` | Use `True` for local development only; set it to `False` in production. |
-| `DJANGO_ALLOWED_HOSTS` | Comma-separated hostnames allowed to serve the application. Set these to your actual local or deployment hosts. |
-| `CSRF_TRUSTED_ORIGINS` | Include the full trusted origins required by your deployment, including the scheme such as `https://`, if applicable. |
-| Email and Admin 2FA settings | Not required for the initial deployment. Email delivery and two-factor authentication are intentionally disabled; configure these later when implementing the feature. |
-
-The `.env.example` file documents the variable names expected by this repository. Keep your real credentials in `.env` or in your hosting provider's environment-variable settings.
-
-**Never commit `.env` or paste real database passwords and S3 secrets into issues, pull requests, logs, screenshots, or frontend code.** If a secret is accidentally published, revoke or rotate it in Supabase.
-
-### 5. Install dependencies and apply migrations
-
-From the Django project directory shown in [Running Locally](#running-locally), install the dependencies and make sure the environment variables are available to Django. Then run:
+Linux / macOS:
 
 ```bash
-python manage.py migrate
-python manage.py createsuperuser
-```
-
-Migrations create the database schema in your configured Supabase PostgreSQL database. They do **not** copy products or images from another Supabase project. The superuser command creates an administrator for your own installation.
-
-### 6. Test database and image storage
-
-Start the application locally:
-
-```bash
-python manage.py runserver
-```
-
-Use Django Admin to create a test product and upload an image. Confirm that:
-
-- The product record is saved and remains available after restarting the server.
-- The uploaded image appears in the `product-images` bucket under `products/`.
-- The image loads on the public catalogue.
-- No credentials appear in the browser, page source, or Git-tracked files.
-
-If database access works but image uploads fail, check the Storage endpoint, region, bucket name, and S3 access credentials. If uploads work but images do not display, verify that the bucket is public and that the generated public URL points to your own project and bucket.
-
-### 7. Moving from another Supabase project
-
-Changing the environment variables connects NqoPerfumes to a different backend; it does **not** migrate existing data. If you are moving an existing catalogue, export and import the database records and separately copy the image files to the new bucket. Check image paths and URLs after migration.
-
-
-## Deploying NqoPerfumes on Vercel
-
-This repository uses Vercel's native Django integration. Vercel detects the Django project from the repository-root `manage.py` file and loads the WSGI callable configured in the root `pyproject.toml`. The customer catalogue is served by Django at `/`; CSS, JavaScript and Django Admin assets are collected from Django's static-file configuration and served through Vercel's CDN.
-
-The old custom `api/index.py` function and manual rewrites are no longer used. Do not restore an `outputDirectory` override pointing at `frontend`: that would bypass the native Django deployment.
-
-### Vercel project settings
-
-Use these settings in **Project → Settings → Build & Development Settings**:
-
-- **Root Directory:** repository root (leave it as `./`; do not select `frontend/` or `nqoperfumes/myshop/`).
-- **Framework Preset:** Django, or Auto Detect if Django is not offered in the menu. Do not force the project to `Other`.
-- **Build Command:** `python scripts/build_vercel.py`. The same command is declared in `pyproject.toml`.
-- **Output Directory:** leave the override disabled / blank. Do not set it to `frontend`.
-- **Install Command:** leave the default so Vercel installs the dependencies declared in the root `pyproject.toml`. The root `requirements.txt` is kept in sync for local development and CI.
-
-The root `manage.py` lets Vercel detect the Django project. The `[project].dependencies` list in `pyproject.toml` is the dependency manifest Vercel reads; `requirements.txt` mirrors that list. CI checks that both lists remain identical. The `[tool.vercel]` section points the native runtime to the root `vercel_wsgi:application` shim. The small build script only generates the public `frontend/config.js`; Vercel's Django integration runs `collectstatic` itself. No manual rewrite rules are required.
-
-### Environment variables
-
-Add the following in **Project → Settings → Environment Variables** for both **Production** and **Preview** (or at least for the environment in which you are testing):
-
-- `DJANGO_SECRET_KEY`: a long, unique random secret. Do not use the development fallback.
-- `DJANGO_DEBUG=False`.
-- `DATABASE_URL`: Supabase PostgreSQL connection string. Use the transaction pooler when recommended for serverless deployments, and URL-encode special characters in the password.
-- `DJANGO_ALLOWED_HOSTS`: optional comma-separated custom hostnames. The application already allows Vercel's `.vercel.app` hostnames. For a custom domain, add its hostname without `https://`, for example `shop.example.com`.
-- `CSRF_TRUSTED_ORIGINS`: optional comma-separated full origins for custom domains, including the scheme, for example `https://shop.example.com`. Vercel origins are included by default.
-- `SUPABASE_URL`: your actual Supabase project URL, for example `https://YOUR_PROJECT_REF.supabase.co`.
-- `SUPABASE_STORAGE_BUCKET=product-images`.
-- `SUPABASE_STORAGE_ENDPOINT`, `SUPABASE_STORAGE_REGION`, `SUPABASE_STORAGE_ACCESS_KEY_ID`, and `SUPABASE_STORAGE_SECRET_ACCESS_KEY`: the S3-compatible Storage settings from Supabase. Keep the access key and secret on the server only.
-- `SITE_THEME`: optional `light` or `dark` default theme for visitors who have not chosen one.
-- `SITE_THEME_LOCK=1`: optional setting that locks the selected `SITE_THEME` for all visitors.
-
-Email delivery and Admin 2FA are intentionally disabled for the initial deployment. SMTP credentials are not required.
-
-The application returns a descriptive HTTP 503 JSON response if a Vercel request arrives before `DJANGO_SECRET_KEY` or `DATABASE_URL` is configured. It does not silently use an ephemeral SQLite database in production.
-
-### Deploy and verify
-
-1. Confirm the latest deployment is using the `main` branch.
-2. In Vercel, open the NqoPerfumes project and check that the Root Directory is the repository root.
-3. Remove any old Build & Development overrides for Output Directory (especially `frontend`) and make sure the Framework Preset is Django / Auto Detect.
-4. Add the production and preview environment variables listed above, then save.
-5. Trigger a new deployment from the latest `main` commit; do not redeploy an older commit.
-6. Confirm the deployment's source commit matches the latest `main` commit and that the build logs show Django's dependencies installed and static collection completing successfully.
-7. Test these routes:
-   - `/` — customer-facing perfume catalogue.
-   - `/static/styles.css` — customer-facing stylesheet.
-   - `/api/health/` — JSON health response.
-   - `/api/products/` — product catalogue API.
-   - `/admin/` — Django Admin login.
-
-Before the first production use, apply database migrations and create the admin user against the Supabase database from a trusted local environment with the production environment variables loaded. Run `python manage.py migrate` and `python manage.py createsuperuser` from `nqoperfumes/myshop/`. Do not run migrations automatically on every Vercel request.
-
-Vercel's function filesystem is ephemeral. Product images must remain in Supabase Storage and structured product data must remain in Supabase PostgreSQL. Never commit `.env`, database passwords, storage secrets or the Django secret key.
-
-## Running Locally
-
-### 1. Install and configure the backend
-
-From the repository root:
-
-```bash
-python -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
+```
+
+Windows PowerShell:
+
+```powershell
+py -3.13 -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+### 3. Install dependencies
+
+```bash
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+```
+
+### 4. Configure environment variables
+
+Copy the example file:
+
+```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your own Django secret, Supabase PostgreSQL connection string, and Supabase Storage credentials. Do not commit the real `.env` file.
+Set the Django and Supabase values in `.env`. Do not commit this file.
 
-Start the Django backend:
+### 5. Apply migrations and create an administrator
 
 ```bash
 cd nqoperfumes/myshop
 python manage.py migrate
 python manage.py createsuperuser
-python manage.py runserver
 ```
 
-The backend API is available at:
-
-- `http://127.0.0.1:8000/api/products/` — product catalogue JSON.
-- `http://127.0.0.1:8000/api/health/` — health check.
-- `http://127.0.0.1:8000/admin/` — product administration.
-
-For local development, the default `.env.example` CORS origins allow a frontend served on port 5500.
-
-### 2. Run the customer-facing site locally
-
-The customer frontend is now served by Django, with its CSS and JavaScript loaded from `/static/`. Start the backend from the Django project directory:
+### 6. Start the development server
 
 ```bash
-cd nqoperfumes/myshop
 python manage.py runserver
 ```
 
-Open `http://127.0.0.1:8000/` to view the perfume catalogue. The local frontend uses the same-origin API at `/api/products/`; no separate static HTTP server is needed.
+Open the application at:
 
-### 3. Run the backend tests
+- Storefront: http://127.0.0.1:8000/
+- Django Admin: http://127.0.0.1:8000/admin/
+- Product API: http://127.0.0.1:8000/api/products/
+- Health check: http://127.0.0.1:8000/api/health/
 
-From `nqoperfumes/myshop` with the virtual environment activated:
+The Django template serves the customer-facing page and its static assets. A separate frontend development server is not required for the normal local workflow.
+
+## Environment variables
+
+The repository includes `.env.example`. The table below describes the main configuration values.
+
+| Variable | Purpose |
+|---|---|
+| `DJANGO_SECRET_KEY` | Secret key used by Django |
+| `DJANGO_DEBUG` | Enables/disables Django debug mode; disable in production |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated allowed hostnames |
+| `CSRF_TRUSTED_ORIGINS` | Comma-separated trusted origins including scheme |
+| `CORS_ALLOWED_ORIGINS` | Allowed origins for API requests |
+| `DATABASE_URL` | PostgreSQL connection URL; SQLite is used when absent for local development |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_STORAGE_BUCKET` | Storage bucket used for product images and catalogue JSON |
+| `SUPABASE_STORAGE_ENDPOINT` | Supabase S3-compatible Storage endpoint |
+| `SUPABASE_STORAGE_REGION` | S3-compatible region value |
+| `SUPABASE_STORAGE_ACCESS_KEY_ID` | Server-side S3 access key |
+| `SUPABASE_STORAGE_SECRET_ACCESS_KEY` | Server-side S3 secret |
+
+The example configuration uses `product-images` as the bucket name. The deployed environment may use a different bucket name; the value must match the bucket configured in Supabase and in the Vercel environment variables.
+
+The Vercel build script generates `frontend/config.js` from `SUPABASE_URL` and `SUPABASE_STORAGE_BUCKET`. This file contains public catalogue configuration only. It must never contain database passwords, Django secrets or S3 credentials.
+
+## Database and storage setup
+
+NqoPerfumes uses two Supabase services:
+
+### PostgreSQL
+
+Set `DATABASE_URL` to the connection string for your Supabase PostgreSQL database. For serverless deployments, use the connection method recommended by Supabase for your hosting environment (typically the transaction pooler). URL-encode special characters in credentials where required.
+
+### Supabase Storage
+
+Create a bucket and set `SUPABASE_STORAGE_BUCKET` to its name. The same bucket stores:
+
+- Product image objects under `products/`.
+- The generated catalogue at `catalogue/products.json`.
+
+The bucket must allow public downloads for the current public image and catalogue URLs to work. S3 access credentials remain private and are used by the Django backend for writes and deletes.
+
+After configuring the services, apply Django migrations and create an administrator. Add or update a product in Django Admin to publish the initial catalogue snapshot.
+
+## Tests and continuous integration
+
+Run the backend checks from `nqoperfumes/myshop/`:
 
 ```bash
 python manage.py check
 python manage.py test
 ```
 
-The GitHub Actions workflow runs Django checks, automated backend tests and frontend JavaScript syntax checks on pushes and pull requests.
-## Data Model
+The GitHub Actions workflow also validates the Vercel configuration, checks that `pyproject.toml` and `requirements.txt` dependency lists match, collects static files, checks Python and JavaScript syntax, and runs the automated Django test suite.
 
-The core application uses a Product model containing:
+To check the frontend JavaScript syntax locally:
 
-- `name`
-- `description`
-- `price`
-- `stock`
-- `image`
-- `created_at`
-- `updated_at`
+```bash
+node --check frontend/app.js
+node --check frontend/config.js
+```
 
-The `image` field remains a normal Django ImageField. Django's storage abstraction determines where the file is physically stored, so application code does not need to manually upload files to Supabase.
+## Deploy to Vercel
 
-The model also exposes an `is_in_stock()` method so the application can determine whether a product currently has available stock.
+The repository is configured for Vercel's native Django deployment.
 
-## Security and Configuration
+Important project settings:
 
-Sensitive configuration belongs in environment variables rather than source code.
+- **Root Directory:** repository root.
+- **Framework Preset:** Django or Auto Detect.
+- **Build Command:** `python scripts/build_vercel.py`.
+- **Output Directory:** leave the override blank.
+- **Install Command:** use the default dependency installation based on the project configuration.
 
-The Supabase Storage S3 credentials provide server-side access and must never be exposed to browser-side JavaScript or committed to Git.
+Configure the environment variables from the previous section in the Vercel project for the required environments (Production and Preview). At minimum, production requires a strong `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=False`, a valid `DATABASE_URL`, and the Supabase Storage settings.
 
-The public product image bucket is intentionally public for catalogue delivery. Public access applies to downloads; administrative uploads and changes remain server-side operations authenticated by the storage credentials.
+Before using a new production database, run migrations and create the admin user from a trusted environment configured with the production database credentials:
 
-## What I Learned
+```bash
+cd nqoperfumes/myshop
+python manage.py migrate
+python manage.py createsuperuser
+```
 
-This project helped me understand the relationship between application development and cloud infrastructure.
+Then deploy the intended branch and verify:
 
-I learned that building a web application is not only about writing frontend and backend code. The application also needs somewhere appropriate to persist structured data, somewhere appropriate to store files, and a reliable way to connect those services.
+| Route | Expected result |
+|---|---|
+| `/` | Customer-facing catalogue |
+| `/admin/` | Django Admin login |
+| `/api/products/` | Product JSON API |
+| `/api/health/` | JSON health response |
+| `/static/styles.css` | Storefront stylesheet |
 
-Using Supabase gives this project a managed PostgreSQL database and persistent object storage while keeping the Django application independent from a local filesystem.
+The Vercel function filesystem is ephemeral. Do not rely on it for persistent product records or uploaded images; use PostgreSQL and Supabase Storage.
 
-The project also demonstrates an important software-engineering principle: Django's storage abstraction allows the application model to remain stable while the underlying storage provider changes.
+## Operational notes
 
-## Project Direction
+- The PostgreSQL database is the source of truth for product records. The JSON file is a generated snapshot for the public storefront.
+- A successful database save and a successful catalogue publish are separate operations. Django Admin reports a publishing error if the JSON update fails; check application logs and Supabase Storage configuration.
+- The frontend requests the catalogue with browser caching disabled and a unique query parameter to avoid stale catalogue responses.
+- Product image deletion is best-effort. If Supabase rejects a delete request, the database deletion remains complete and the cleanup error is logged.
+- Django signals run for ORM deletions. Changes made directly in SQL bypass Django signals and do not trigger image cleanup or catalogue publishing.
+- The current product deletion signal protects shared image references, but it does not perform a historical sweep of orphaned objects.
 
-The project began as a simple solution to help my mother's perfume business move away from a physical catalogue and toward a shareable digital catalogue.
+## Security considerations
 
-As I continue developing it, the project can evolve beyond a basic product listing into a more complete commerce system, including stronger inventory management, order workflows, customer interactions and cloud-native infrastructure.
+- Never commit `.env`, database credentials, S3 secrets or `DJANGO_SECRET_KEY`.
+- Keep Supabase S3 credentials on the server. Never expose them through `frontend/config.js`, browser JavaScript or public source files.
+- Public bucket access is intentional for public product images and the storefront catalogue. Do not store private documents or sensitive user data in that bucket.
+- Use `DJANGO_DEBUG=False` in production and configure allowed hosts and trusted origins for any custom domain.
+- Rotate any credential that is accidentally exposed.
 
-The main lesson remains simple: **software should solve a real problem first, and the technology should support that problem.**
+## Engineering decisions and learning
+
+Several implementation choices are worth highlighting:
+
+**A relational database for structured records.** Product attributes such as names, prices and stock quantities belong in PostgreSQL rather than being maintained only in a static file.
+
+**Object storage for media.** Product images are stored outside the application runtime, so deployments do not depend on a persistent local filesystem.
+
+**A generated JSON read model.** The storefront can retrieve a complete catalogue snapshot without requiring every visitor to query the database directly. The Django API remains available as a fallback.
+
+**Explicit cache invalidation.** A mutable catalogue must not be treated like an immutable image asset. The publisher sets no-cache metadata, and the frontend avoids reusing cached catalogue responses.
+
+**Lifecycle-aware file cleanup.** Deleting a product should not delete an image still used by another product. The deletion signal checks remaining references before attempting storage cleanup.
+
+The project has been a practical exercise in connecting backend development, data persistence, cloud storage, deployment configuration and operational reliability.
+
+## Roadmap
+
+Potential next steps include:
+
+- Add an order-request workflow.
+- Introduce customer-facing enquiry and contact flows.
+- Improve inventory audit history and stock management.
+- Add structured logging and operational monitoring for catalogue publishing and storage cleanup.
+- Add integration tests for database and storage workflows.
+- Review and strengthen database access policies as the application grows.
+
+These are planned improvements, not features currently represented as complete.
+
+---
+
+**Built to solve a real problem, and developed to explore practical full-stack engineering.**
