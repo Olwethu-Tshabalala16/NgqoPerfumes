@@ -168,9 +168,11 @@
 
     for (const source of sources) {
       try {
-        const response = await fetch(source, {
+        const catalogueRequestUrl = new URL(source, window.location.href);
+        // Use a fresh URL so an edge cache cannot keep serving an older catalogue.
+        catalogueRequestUrl.searchParams.set("v", String(Date.now()));
+        const response = await fetch(catalogueRequestUrl.toString(), {
           headers: { Accept: "application/json" },
-          // The JSON catalogue is mutable; do not reuse a stale browser cache.
           cache: "no-store"
         });
         if (!response.ok) {
