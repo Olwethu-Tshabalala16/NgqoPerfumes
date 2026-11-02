@@ -91,7 +91,7 @@ class CataloguePublishingTests(TestCase):
         SUPABASE_STORAGE_ACCESS_KEY_ID="test-access-key",
         SUPABASE_STORAGE_SECRET_ACCESS_KEY="test-secret-key",
     )
-    def test_publish_writes_json_to_fixed_supabase_object_key(self):
+    def test_publish_writes_json_to_fixed_supabase_object_key_without_stale_cache(self):
         from .catalogue import CATALOGUE_OBJECT_KEY, publish_catalogue
 
         with patch("store.catalogue.SupabaseS3Storage") as storage_class:
@@ -102,6 +102,13 @@ class CataloguePublishingTests(TestCase):
 
         storage_class.assert_called_once_with(file_overwrite=True)
         storage.save.assert_called_once()
+        self.assertEqual(
+            storage.object_parameters,
+            {
+                "CacheControl": "no-store, no-cache, max-age=0, must-revalidate",
+                "ContentType": "application/json",
+            },
+        )
         key, content_file = storage.save.call_args.args
         self.assertEqual(key, CATALOGUE_OBJECT_KEY)
         self.assertIsInstance(content_file, ContentFile)
@@ -122,6 +129,42 @@ class CataloguePublishingTests(TestCase):
 
         with self.assertRaises(ImproperlyConfigured):
             publish_catalogue()
+
+
+class ProductImageCleanupTests(TestCase):
+    def test_deleting_product_removes_its_unreferenced_image(self):
+        product = Product.objects.create(
+            name="Image to remove",
+            price=Decimal("100.00"),
+            image="products/orphan.jpg",
+        )
+        image_storage = Product._meta.get_field("image").storage
+
+        with patch.object(image_storage, "delete") as delete_image:
+            product.delete()
+
+        delete_image.assert_called_once_with("products/orphan.jpg")
+
+    def test_shared_image_is_removed_only_after_last_product_is_deleted(self):
+        first = Product.objects.create(
+            name="First product",
+            price=Decimal("100.00"),
+            image="products/shared.jpg",
+        )
+        second = Product.objects.create(
+            name="Second product",
+            price=Decimal("120.00"),
+            image="products/shared.jpg",
+        )
+        image_storage = Product._meta.get_field("image").storage
+
+        with patch.object(image_storage, "delete") as delete_image:
+            first.delete()
+            delete_image.assert_not_called()
+
+            second.delete()
+
+        delete_image.assert_called_once_with("products/shared.jpg")
 
 
 class SupabaseStorageTests(TestCase):
@@ -147,7 +190,6 @@ class SupabaseStorageTests(TestCase):
             storage.get_available_name("catalogue/products.json"),
             "catalogue/products.json",
         )
-
 
 
 class AdminDashboardTests(TestCase):
@@ -202,8 +244,6 @@ class VercelDeploymentTests(TestCase):
     def test_vercel_reports_missing_runtime_configuration_as_503(self):
         import os
 
-        from unittest.mock import patch
-
         with patch.dict(
             os.environ,
             {
@@ -223,8 +263,6 @@ class VercelDeploymentTests(TestCase):
     def test_vercel_request_passes_when_required_configuration_exists(self):
         import os
 
-        from unittest.mock import patch
-
         with patch.dict(
             os.environ,
             {
@@ -239,6 +277,7 @@ class VercelDeploymentTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+
     def test_wsgi_configuration_uses_importable_repository_root_shim(self):
         from django.conf import settings
         import vercel_wsgi

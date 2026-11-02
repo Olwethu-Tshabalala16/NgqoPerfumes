@@ -169,7 +169,9 @@
     for (const source of sources) {
       try {
         const response = await fetch(source, {
-          headers: { Accept: "application/json" }
+          headers: { Accept: "application/json" },
+          // The JSON catalogue is mutable; do not reuse a stale browser cache.
+          cache: "no-store"
         });
         if (!response.ok) {
           throw new Error(`The catalogue service returned HTTP ${response.status}.`);
