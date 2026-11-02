@@ -124,6 +124,31 @@ class CataloguePublishingTests(TestCase):
             publish_catalogue()
 
 
+class SupabaseStorageTests(TestCase):
+    def test_product_upload_names_are_unique_without_checking_remote_object(self):
+        from .storage import SupabaseS3Storage
+
+        storage = SupabaseS3Storage(file_overwrite=False)
+        with patch.object(storage, "exists") as exists:
+            first_name = storage.get_available_name("products/amber.jpg")
+            second_name = storage.get_available_name("products/amber.jpg")
+
+        self.assertTrue(first_name.startswith("products/"))
+        self.assertTrue(first_name.endswith("_amber.jpg"))
+        self.assertNotEqual(first_name, second_name)
+        exists.assert_not_called()
+
+    def test_overwrite_storage_keeps_fixed_catalogue_object_name(self):
+        from .storage import SupabaseS3Storage
+
+        storage = SupabaseS3Storage(file_overwrite=True)
+
+        self.assertEqual(
+            storage.get_available_name("catalogue/products.json"),
+            "catalogue/products.json",
+        )
+
+
 
 class AdminDashboardTests(TestCase):
     def setUp(self):
