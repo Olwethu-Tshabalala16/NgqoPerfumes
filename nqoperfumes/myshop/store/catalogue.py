@@ -56,7 +56,12 @@ def publish_catalogue():
         )
 
     payload = json.dumps(build_catalogue(), ensure_ascii=False, indent=2).encode("utf-8")
-    # Override only for this fixed object key; product images retain unique filenames.
+    # Override only for this fixed object key. Product images keep their own
+    # caching policy, while the catalogue must always reflect the latest save/delete.
     storage = SupabaseS3Storage(file_overwrite=True)
+    storage.object_parameters = {
+        "CacheControl": "no-store, no-cache, max-age=0, must-revalidate",
+        "ContentType": "application/json",
+    }
     storage.save(CATALOGUE_OBJECT_KEY, ContentFile(payload))
     return storage.url(CATALOGUE_OBJECT_KEY)
