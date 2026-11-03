@@ -1,14 +1,14 @@
-# NqoPerfumes
+# NgqoPerfumes
 
 A Django-powered digital fragrance catalogue built to solve a real problem for a small family perfume business.
 
 <p align="center">
   <a href="https://ngqoperfumes.vercel.app"><strong>Live application</strong></a>
   ·
-  <a href="https://github.com/Olwethu-Tshabalala16/NqoPerfumes"><strong>Source code</strong></a>
+  <a href="https://github.com/Olwethu-Tshabalala16/NgqoPerfumes"><strong>Source code</strong></a>
 </p>
 
-NqoPerfumes replaces a manually shared product catalogue with a single, shareable website. Customers can browse fragrances, search the collection, view product details, prices, availability and product images. Product information is managed through Django Admin, while Supabase provides persistent database and object-storage infrastructure.
+NgqoPerfumes replaces a manually shared product catalogue with a single, shareable website. Customers can browse fragrances, search the collection, view product details, prices, availability and product images. Product information is managed through Django Admin, while Supabase provides persistent database and object-storage infrastructure.
 
 > **Project status:** Deployed on Vercel. The current scope is a product catalogue with administrative product management; it is not yet a complete e-commerce checkout or payment platform.
 
@@ -34,7 +34,7 @@ NqoPerfumes replaces a manually shared product catalogue with a single, shareabl
 
 ## Overview
 
-The project began with a practical problem. My mother was running a small perfume business and relied on printed or manually shared catalogues to show customers the available products. I built NqoPerfumes to make that catalogue accessible through one link.
+The project began with a practical problem. My mother was running a small perfume business and relied on printed or manually shared catalogues to show customers the available products. I built NgqoPerfumes to make that catalogue accessible through one link.
 
 The application has since developed into a small full-stack system. It combines a Django application, a relational database, object storage, a static customer-facing interface and a deployment pipeline.
 
@@ -120,7 +120,7 @@ Images are stored separately from the JSON catalogue. When a product is deleted,
 ## Repository structure
 
 ```text
-NqoPerfumes/
+NgqoPerfumes/
 ├── .github/
 │   └── workflows/
 │       └── django.yml             # CI checks and automated tests
@@ -209,8 +209,8 @@ The values above are illustrative, not live product data.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Olwethu-Tshabalala16/NqoPerfumes.git
-cd NqoPerfumes
+git clone https://github.com/Olwethu-Tshabalala16/NgqoPerfumes.git
+cd NgqoPerfumes
 ```
 
 ### 2. Create and activate a virtual environment
@@ -294,7 +294,7 @@ The Vercel build script generates `frontend/config.js` from `SUPABASE_URL` and `
 
 ## Database and storage setup
 
-NqoPerfumes uses two Supabase services:
+NgqoPerfumes uses two Supabase services:
 
 ### PostgreSQL
 
