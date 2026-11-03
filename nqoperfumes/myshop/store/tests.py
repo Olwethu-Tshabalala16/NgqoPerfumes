@@ -206,7 +206,7 @@ class AdminDashboardTests(TestCase):
         response = self.client.get(reverse("admin:index"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Nqo Perfumes")
+        self.assertContains(response, "NgqoPerfumes")
         self.assertContains(response, 'data-theme-toggle')
         self.assertRegex(response.content.decode(), r"/static/theme(?:\.[a-zA-Z0-9]+)?\.js")
 
