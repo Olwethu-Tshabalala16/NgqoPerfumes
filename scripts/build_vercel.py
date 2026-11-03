@@ -17,7 +17,7 @@ CONFIG_FILE = FRONTEND / "config.js"
 def main():
     if not (FRONTEND / "index.html").is_file():
         raise SystemExit(
-            "NgqoPerfumes build failed: frontend/index.html was not found. "
+            "Ngqo Perfumes build failed: frontend/index.html was not found. "
             "Check the Vercel Root Directory setting."
         )
 
@@ -50,7 +50,7 @@ def main():
         + ";\n",
         encoding="utf-8",
     )
-    print("NgqoPerfumes frontend configuration generated.")
+    print("Ngqo Perfumes frontend configuration generated.")
     print(f"Supabase catalogue configured: {bool(catalogue_url)}")
 
 
