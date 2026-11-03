@@ -2,9 +2,11 @@
   "use strict";
 
   const config = window.NGQO_CONFIG || {};
-  const apiBaseUrl = (config.API_BASE_URL || "").replace(/\/+$/, "");
+  const apiBaseUrl = (config.API_BASE_URL || "").replace(/\\/+$/, "");
   const productsEndpoint = `${apiBaseUrl}/api/products/`;
+  const versionEndpoint = `${apiBaseUrl}/api/products/version/`;
   const catalogueJsonUrl = (config.CATALOGUE_JSON_URL || "").trim();
+  const refreshIntervalMs = 15000;
 
   const grid = document.querySelector("#product-grid");
   const status = document.querySelector("#catalogue-status");
@@ -18,6 +20,8 @@
   const dialogStock = document.querySelector("#dialog-product-stock");
   const dialogClose = document.querySelector("#dialog-close");
   let products = [];
+  let catalogueVersion = null;
+  let checkingForUpdates = false;
 
   year.textContent = new Date().getFullYear();
 
@@ -39,6 +43,8 @@
 
   function makeProductCard(product) {
     const card = element("article", "product-card");
+    card.dataset.productId = String(product.id);
+    card.dataset.productSignature = JSON.stringify(product);
     card.tabIndex = 0;
     card.setAttribute("role", "button");
     card.setAttribute("aria-haspopup", "dialog");
@@ -51,6 +57,7 @@
         openProductDetails(product);
       }
     });
+
     const imageFrame = element("div", "product-image");
     const placeholder = element("span", "image-placeholder", "✳");
     placeholder.setAttribute("aria-hidden", "true");
@@ -94,6 +101,7 @@
   }
 
   function openProductDetails(product) {
+    productDialog.dataset.productId = String(product.id);
     dialogName.textContent = product.name || "Untitled fragrance";
     dialogDescription.textContent = product.description || "Contact us for more information about this fragrance.";
     dialogPrice.textContent = formatPrice(product.price);
@@ -102,28 +110,42 @@
     dialogStock.textContent = available ? `In stock · ${product.stock}` : "Out of stock";
     dialogStock.className = available ? "stock-status in-stock" : "stock-status out-of-stock";
 
+    const imagePlaceholder = productDialog.querySelector(".dialog-image-placeholder");
     if (product.image_url) {
       dialogImage.src = product.image_url;
       dialogImage.alt = product.name ? `${product.name} fragrance` : "Fragrance product";
       dialogImage.hidden = false;
+      if (imagePlaceholder) imagePlaceholder.hidden = true;
     } else {
       dialogImage.removeAttribute("src");
       dialogImage.alt = "";
       dialogImage.hidden = true;
+      if (imagePlaceholder) imagePlaceholder.hidden = false;
     }
 
     if (!productDialog.open) productDialog.showModal();
   }
 
+  function refreshOpenProductDetails() {
+    if (!productDialog.open) return;
+    const productId = productDialog.dataset.productId;
+    const latestProduct = products.find((product) => String(product.id) === productId);
+
+    if (latestProduct) {
+      openProductDetails(latestProduct);
+    } else {
+      dialogDescription.textContent = "This fragrance is no longer listed in the catalogue.";
+      dialogStock.textContent = "No longer listed";
+      dialogStock.className = "stock-status out-of-stock";
+    }
+  }
+
   dialogClose.addEventListener("click", () => productDialog.close());
   productDialog.addEventListener("click", (event) => {
-    // A click on the shaded backdrop closes the detail view; clicks inside do not.
     if (event.target === productDialog) productDialog.close();
   });
 
   function renderProducts(items) {
-    grid.replaceChildren();
-
     if (!items.length) {
       const empty = element("div", "empty-state");
       empty.append(
@@ -137,13 +159,43 @@
             : "Please check back soon for the latest collection."
         )
       );
-      grid.append(empty);
+      grid.replaceChildren(empty);
       return;
     }
 
-    const fragment = document.createDocumentFragment();
-    items.forEach((product) => fragment.append(makeProductCard(product)));
-    grid.append(fragment);
+    grid.querySelector(".empty-state, .error-message, .retry-button")?.remove();
+    const existingCards = new Map(
+      [...grid.querySelectorAll(".product-card[data-product-id]")]
+        .map((card) => [card.dataset.productId, card])
+    );
+
+    items.forEach((product, index) => {
+      const productId = String(product.id);
+      const signature = JSON.stringify(product);
+      let card = existingCards.get(productId);
+
+      if (!card || card.dataset.productSignature !== signature) {
+        const replacement = makeProductCard(product);
+        const hadFocus = card === document.activeElement;
+
+        if (card) {
+          card.replaceWith(replacement);
+        } else {
+          grid.insertBefore(replacement, grid.children[index] || null);
+        }
+
+        if (hadFocus) replacement.focus({ preventScroll: true });
+        card = replacement;
+      }
+
+      existingCards.delete(productId);
+      const currentAtIndex = grid.children[index];
+      if (currentAtIndex !== card) {
+        grid.insertBefore(card, currentAtIndex || null);
+      }
+    });
+
+    existingCards.forEach((staleCard) => staleCard.remove());
   }
 
   function filterProducts() {
@@ -152,14 +204,36 @@
       const searchable = `${product.name || ""} ${product.description || ""}`.toLocaleLowerCase();
       return searchable.includes(query);
     });
+
     renderProducts(filtered);
-    if (query) status.textContent = `${filtered.length} matching fragrance${filtered.length === 1 ? "" : "s"}.`;
-    else status.textContent = `${products.length} fragrance${products.length === 1 ? "" : "s"} in the collection.`;
+    if (query) {
+      status.textContent = `${filtered.length} matching fragrance${filtered.length === 1 ? "" : "s"}.`;
+    } else {
+      status.textContent = `${products.length} fragrance${products.length === 1 ? "" : "s"} in the collection.`;
+    }
   }
 
-  async function loadProducts() {
-    status.textContent = "Loading fragrances…";
-    grid.replaceChildren();
+  async function fetchCatalogueVersion() {
+    const url = new URL(versionEndpoint, window.location.href);
+    url.searchParams.set("v", String(Date.now()));
+    const response = await fetch(url.toString(), {
+      headers: { Accept: "application/json" },
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      throw new Error(`The catalogue version service returned HTTP ${response.status}.`);
+    }
+
+    const payload = await response.json();
+    if (typeof payload.version !== "string") {
+      throw new Error("The catalogue version response has an unexpected format.");
+    }
+    return payload.version;
+  }
+
+  async function loadProducts({ silent = false } = {}) {
+    if (!silent && products.length === 0) status.textContent = "Loading fragrances…";
 
     const sources = catalogueJsonUrl
       ? [catalogueJsonUrl, productsEndpoint]
@@ -169,12 +243,12 @@
     for (const source of sources) {
       try {
         const catalogueRequestUrl = new URL(source, window.location.href);
-        // Use a fresh URL so an edge cache cannot keep serving an older catalogue.
         catalogueRequestUrl.searchParams.set("v", String(Date.now()));
         const response = await fetch(catalogueRequestUrl.toString(), {
           headers: { Accept: "application/json" },
           cache: "no-store"
         });
+
         if (!response.ok) {
           throw new Error(`The catalogue service returned HTTP ${response.status}.`);
         }
@@ -183,13 +257,15 @@
         const items = Array.isArray(payload.products)
           ? payload.products
           : (Array.isArray(payload.results) ? payload.results : null);
+
         if (!items) {
           throw new Error("The catalogue response has an unexpected format.");
         }
 
         products = items;
         filterProducts();
-        return;
+        refreshOpenProductDetails();
+        return true;
       } catch (error) {
         lastError = error;
         console.warn(`Catalogue source failed (${source}); trying the next source if available.`, error);
@@ -197,16 +273,61 @@
     }
 
     console.error("Unable to load the product catalogue:", lastError);
-    status.textContent = "The catalogue could not be loaded.";
-    const retry = element("button", "retry-button", "Try again");
-    retry.type = "button";
-    retry.addEventListener("click", loadProducts);
-    grid.replaceChildren(
-      element("p", "error-message", "Check your connection and the catalogue configuration, then try again."),
-      retry
-    );
+    if (!silent && products.length === 0) {
+      status.textContent = "The catalogue could not be loaded.";
+      const retry = element("button", "retry-button", "Try again");
+      retry.type = "button";
+      retry.addEventListener("click", () => loadProducts());
+      grid.replaceChildren(
+        element("p", "error-message", "Check your connection and the catalogue configuration, then try again."),
+        retry
+      );
+    }
+    return false;
+  }
+
+  async function checkForCatalogueUpdates() {
+    if (checkingForUpdates || document.hidden) return;
+    checkingForUpdates = true;
+
+    try {
+      const latestVersion = await fetchCatalogueVersion();
+      if (catalogueVersion === null) {
+        catalogueVersion = latestVersion;
+      } else if (latestVersion !== catalogueVersion) {
+        const refreshed = await loadProducts({ silent: true });
+        if (refreshed) catalogueVersion = latestVersion;
+      }
+    } catch (error) {
+      // Keep the last good catalogue visible and retry on the next interval.
+      console.warn("Catalogue update check failed; the current catalogue remains available.", error);
+    } finally {
+      checkingForUpdates = false;
+    }
   }
 
   searchInput.addEventListener("input", filterProducts);
-  loadProducts();
+
+  async function startCatalogue() {
+    try {
+      catalogueVersion = await fetchCatalogueVersion();
+    } catch (error) {
+      console.warn("Initial catalogue version check failed; background checks will retry.", error);
+    }
+
+    await loadProducts();
+    if (catalogueVersion === null) {
+      try {
+        catalogueVersion = await fetchCatalogueVersion();
+      } catch (error) {
+        console.warn("Catalogue version is not available yet.", error);
+      }
+    }
+  }
+
+  startCatalogue();
+  window.setInterval(checkForCatalogueUpdates, refreshIntervalMs);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) checkForCatalogueUpdates();
+  });
 })();
