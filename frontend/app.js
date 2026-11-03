@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const config = window.NQO_CONFIG || {};
+  const config = window.NGQO_CONFIG || {};
   const apiBaseUrl = (config.API_BASE_URL || "").replace(/\/+$/, "");
   const productsEndpoint = `${apiBaseUrl}/api/products/`;
   const catalogueJsonUrl = (config.CATALOGUE_JSON_URL || "").trim();
