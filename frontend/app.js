@@ -2,7 +2,7 @@
   "use strict";
 
   const config = window.NGQO_CONFIG || {};
-  const apiBaseUrl = (config.API_BASE_URL || "").replace(/\\/+$/, "");
+  const apiBaseUrl = (config.API_BASE_URL || "").replace(/\/+$/, "");
   const productsEndpoint = `${apiBaseUrl}/api/products/`;
   const versionEndpoint = `${apiBaseUrl}/api/products/version/`;
   const catalogueJsonUrl = (config.CATALOGUE_JSON_URL || "").trim();
