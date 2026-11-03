@@ -1,10 +1,12 @@
 import json
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from django.urls import reverse
 
 from .models import Product
@@ -38,6 +40,32 @@ class ProductApiTests(TestCase):
                 "image_url": None,
             },
         )
+
+    def test_catalogue_version_changes_when_products_change(self):
+        url = reverse("store:product_catalogue_version_api")
+        first_response = self.client.get(url)
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertIn("no-store", first_response["Cache-Control"])
+        first_version = first_response.json()["version"]
+
+        Product.objects.create(
+            name="Rose Musk",
+            price=Decimal("199.00"),
+            stock=2,
+        )
+        created_version = self.client.get(url).json()["version"]
+        self.assertNotEqual(first_version, created_version)
+
+        Product.objects.filter(pk=self.product.pk).update(
+            updated_at=timezone.now() + timedelta(seconds=2)
+        )
+        updated_version = self.client.get(url).json()["version"]
+        self.assertNotEqual(created_version, updated_version)
+
+        self.product.delete()
+        deleted_version = self.client.get(url).json()["version"]
+        self.assertNotEqual(updated_version, deleted_version)
 
     def test_product_list_is_read_only(self):
         response = self.client.post(reverse("store:product_list_api"), data={})
