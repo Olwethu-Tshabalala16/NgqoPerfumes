@@ -163,7 +163,7 @@
       return;
     }
 
-    grid.querySelector(".empty-state, .error-message, .retry-button")?.remove();
+    grid.querySelectorAll(".empty-state, .error-message, .retry-button").forEach((node) => node.remove());
     const existingCards = new Map(
       [...grid.querySelectorAll(".product-card[data-product-id]")]
         .map((card) => [card.dataset.productId, card])
