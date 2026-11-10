@@ -2,14 +2,24 @@ import re
 import threading
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.test import override_settings
 from playwright.sync_api import expect, sync_playwright
 
 from store.catalogue import build_catalogue
 from store.models import Product
 
 
+@override_settings(
+    STORAGES={
+        **settings.STORAGES,
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+        },
+    }
+)
 class StorefrontBrowserTests(StaticLiveServerTestCase):
     """Exercise the storefront and Django admin in an isolated test database."""
 
