@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Browse the Ngqo Perfumes fragrance catalogue.">
+  <meta name="description" content="Browse the Ngqo Perfumes product catalogue.">
   <meta name="theme-color" content="#2c2a2a">
-  <title>Ngqo Perfumes | Fragrance Catalogue</title>
+  <title>Ngqo Perfumes | Product Catalogue</title>
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/config.js"></script>
   <script src="/static/catalogue-utils.js" defer></script>
@@ -35,10 +35,10 @@
 
   <main>
     <section class="hero" aria-labelledby="hero-title">
-      <p class="eyebrow">THE FRAGRANCE EDIT</p>
+      <p class="eyebrow">THE PRODUCT EDIT</p>
       <h1 id="hero-title">Find a scent that<br><em>feels like you.</em></h1>
       <p class="hero-copy">Explore the current fragrance collection, product details and availability in one place.</p>
-      <a class="hero-link" href="#catalogue">Browse fragrances <span aria-hidden="true">↓</span></a>
+      <a class="hero-link" href="#catalogue">Browse products <span aria-hidden="true">↓</span></a>
       <div class="hero-decoration" aria-hidden="true"><span>✳</span></div>
     </section>
 
@@ -49,27 +49,27 @@
           <h2 id="catalogue-title">The catalogue</h2>
         </div>
         <label class="search-box">
-          <span class="visually-hidden">Search fragrances</span>
+          <span class="visually-hidden">Search products</span>
           <span aria-hidden="true">⌕</span>
           <input id="product-search" type="search" placeholder="Search fragrances..." autocomplete="off">
         </label>
       </div>
 
-      <p id="catalogue-status" class="catalogue-status" role="status" aria-live="polite">Loading fragrances…</p>
+      <p id="catalogue-status" class="catalogue-status" role="status" aria-live="polite">Loading products…</p>
       <div id="product-grid" class="product-grid" aria-live="polite"></div>
     </section>
   </main>
 
 
   <dialog id="product-dialog" class="product-dialog" aria-labelledby="dialog-product-name">
-    <button id="dialog-close" class="dialog-close" type="button" aria-label="Close fragrance details">×</button>
+    <button id="dialog-close" class="dialog-close" type="button" aria-label="Close product details">×</button>
     <div class="dialog-product-layout">
       <div class="dialog-image-frame">
         <img id="dialog-product-image" class="dialog-product-image" alt="" hidden>
         <span class="dialog-image-placeholder" aria-hidden="true">✳</span>
       </div>
       <div class="dialog-product-copy">
-        <p class="eyebrow">FRAGRANCE DETAILS</p>
+        <p class="eyebrow">PRODUCT DETAILS</p>
         <h2 id="dialog-product-name"></h2>
         <p id="dialog-product-description" class="dialog-product-description"></p>
         <div class="dialog-product-meta">
