@@ -70,9 +70,6 @@ def delete_unreferenced_product_image(sender, instance, **kwargs):
     if not image_name:
         return
 
-    storage = instance.image.storage
-    transaction.on_commit(
-        lambda: _delete_image_if_unreferenced(
-            storage, image_name, instance.pk, "deleted"
-        )
+    _delete_image_if_unreferenced(
+        instance.image.storage, image_name, instance.pk, "deleted"
     )
