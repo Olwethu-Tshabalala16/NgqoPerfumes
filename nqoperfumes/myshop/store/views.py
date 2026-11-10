@@ -1,7 +1,7 @@
-from django.db.models import Count, Max
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
+from .catalogue import get_catalogue_revision
 from .models import Product
 
 
@@ -33,21 +33,8 @@ def product_list_api(request):
 
 @require_GET
 def product_catalogue_version_api(request):
-    """Return a lightweight token that changes when products are added, edited or removed."""
-    summary = Product.objects.aggregate(
-        count=Count("pk"),
-        latest_updated_at=Max("updated_at"),
-        latest_id=Max("pk"),
-    )
-    latest_updated_at = summary["latest_updated_at"]
-    version = ":".join(
-        (
-            str(summary["count"]),
-            str(summary["latest_id"] or 0),
-            latest_updated_at.isoformat() if latest_updated_at else "empty",
-        )
-    )
-    response = JsonResponse({"version": version})
+    """Return the same revision embedded in the published catalogue."""
+    response = JsonResponse({"version": get_catalogue_revision()})
     response["Cache-Control"] = "no-store, no-cache, max-age=0, must-revalidate"
     return response
 
