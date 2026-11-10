@@ -369,3 +369,21 @@ button, input { font: inherit; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+
+/* Product image loading: retain the placeholder space and fade in decoded images. */
+.product-image { contain: layout paint; }
+.product-photo {
+  display: block;
+  opacity: 0;
+  transition: opacity .28s ease;
+}
+.product-photo.is-loaded { opacity: 1; }
+.dialog-product-image {
+  opacity: 0;
+  transition: opacity .28s ease;
+}
+.dialog-product-image.is-loaded { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .product-photo, .dialog-product-image { transition: none; }
+}
