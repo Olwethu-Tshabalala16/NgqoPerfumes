@@ -173,8 +173,7 @@ class ProductImageCleanupTests(TestCase):
         image_storage = Product._meta.get_field("image").storage
 
         with patch.object(image_storage, "delete") as delete_image:
-            with self.captureOnCommitCallbacks(execute=True):
-                product.delete()
+            product.delete()
 
         delete_image.assert_called_once_with("products/orphan.jpg")
 
@@ -192,10 +191,10 @@ class ProductImageCleanupTests(TestCase):
         image_storage = Product._meta.get_field("image").storage
 
         with patch.object(image_storage, "delete") as delete_image:
-            with self.captureOnCommitCallbacks(execute=True):
-                first.delete()
-                delete_image.assert_not_called()
-                second.delete()
+            first.delete()
+            delete_image.assert_not_called()
+
+            second.delete()
 
         delete_image.assert_called_once_with("products/shared.jpg")
 
