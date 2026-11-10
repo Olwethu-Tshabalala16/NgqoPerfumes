@@ -51,7 +51,7 @@ class StorefrontBrowserTests(StaticLiveServerTestCase):
     def test_storefront_falls_back_after_publish_failure_and_recovers(self):
         product = Product.objects.create(
             name="Amber Oud",
-            description="A warm woody fragrance.",
+            description="A warm woody scent.",
             price=Decimal("249.99"),
             stock=3,
             image="products/missing-image.jpg",
@@ -96,12 +96,14 @@ class StorefrontBrowserTests(StaticLiveServerTestCase):
 
                 card = page.locator(f'.product-card[data-product-id="{product.pk}"]')
                 expect(card).to_be_visible()
+                expect(page.locator("#catalogue-status")).to_have_text("1 product in the collection.")
+                expect(page.locator("#catalogue-status")).not_to_contain_text("Loading")
                 expect(card.locator(".image-placeholder")).to_be_visible(timeout=10_000)
                 expect(card.locator("img.product-photo")).to_have_count(0)
 
                 search = page.locator("#product-search")
                 search.fill("not in the catalogue")
-                expect(page.locator(".empty-state")).to_contain_text("No matching fragrances")
+                expect(page.locator(".empty-state")).to_contain_text("No matching products")
                 search.fill("amber")
                 expect(card).to_be_visible()
 
