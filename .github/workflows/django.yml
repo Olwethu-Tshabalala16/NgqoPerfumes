@@ -146,7 +146,7 @@ jobs:
 
       - name: Run Django live-server browser end-to-end tests
         working-directory: nqoperfumes/myshop
-        run: python manage.py test tests.e2e --verbosity=2
+        run: python manage.py test tests.e2e.test_browser_flows --verbosity=2
 
 
   security:
