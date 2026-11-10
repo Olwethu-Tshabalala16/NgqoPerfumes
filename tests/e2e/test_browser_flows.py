@@ -1,110 +1,137 @@
 import re
 from decimal import Decimal
 
-import pytest
 from django.contrib.auth import get_user_model
-from playwright.sync_api import expect
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from playwright.sync_api import sync_playwright
 
 from store.catalogue import build_catalogue
 from store.models import Product
 
 
-@pytest.mark.django_db(transaction=True)
-def test_storefront_falls_back_after_publish_failure_and_recovers(page, live_server):
-    product = Product.objects.create(
-        name="Amber Oud",
-        description="A warm woody fragrance.",
-        price=Decimal("249.99"),
-        stock=3,
-        image="products/missing-image.jpg",
-    )
-    publication = {"available": False, "payload": None}
+class StorefrontBrowserTests(StaticLiveServerTestCase):
+    """Exercise the real storefront and Django admin in an isolated test DB."""
 
-    def serve_frontend_config(route):
-        route.fulfill(
-            status=200,
-            content_type="application/javascript",
-            body=(
-                "window.NGQO_CONFIG = {"
-                " CATALOGUE_JSON_URL: '/__tests__/catalogue.json',"
-                " API_BASE_URL: ''"
-                "};"
-            ),
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.playwright = sync_playwright().start()
+        try:
+            cls.browser = cls.playwright.chromium.launch(headless=True)
+        except Exception:
+            cls.playwright.stop()
+            super().tearDownClass()
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            cls.browser.close()
+        finally:
+            cls.playwright.stop()
+            super().tearDownClass()
+
+    def setUp(self):
+        self.page = self.browser.new_page()
+
+    def tearDown(self):
+        self.page.close()
+
+    def test_storefront_falls_back_after_publish_failure_and_recovers(self):
+        product = Product.objects.create(
+            name="Amber Oud",
+            description="A warm woody fragrance.",
+            price=Decimal("249.99"),
+            stock=3,
+            image="products/missing-image.jpg",
+        )
+        publication = {"available": False, "payload": None}
+
+        def serve_frontend_config(route):
+            route.fulfill(
+                status=200,
+                content_type="application/javascript",
+                body=(
+                    "window.NGQO_CONFIG = {"
+                    " CATALOGUE_JSON_URL: '/__tests__/catalogue.json',"
+                    " API_BASE_URL: ''"
+                    "};"
+                ),
+            )
+
+        def serve_published_catalogue(route):
+            if not publication["available"]:
+                route.fulfill(
+                    status=503,
+                    content_type="application/json",
+                    body='{"detail":"temporary storage outage"}',
+                )
+                return
+
+            route.fulfill(status=200, json=publication["payload"])
+
+        self.page.route("**/static/config.js", serve_frontend_config)
+        self.page.route("**/__tests__/catalogue.json*", serve_published_catalogue)
+        self.page.route(
+            "**/products/missing-image.jpg",
+            lambda route: route.fulfill(status=404),
         )
 
-    def serve_published_catalogue(route):
-        if not publication["available"]:
-            route.fulfill(
-                status=503,
-                content_type="application/json",
-                body='{"detail":"temporary storage outage"}',
-            )
-            return
+        self.page.goto(f"{self.live_server_url}/")
 
-        route.fulfill(status=200, json=publication["payload"])
+        card = self.page.locator(f'.product-card[data-product-id="{product.pk}"]')
+        self.assertTrue(card.is_visible())
+        self.assertTrue(card.locator(".image-placeholder").is_visible())
+        self.assertEqual(card.locator("img.product-photo").count(), 0)
 
-    page.route("**/static/config.js", serve_frontend_config)
-    page.route("**/__tests__/catalogue.json*", serve_published_catalogue)
-    page.route(
-        "**/products/missing-image.jpg",
-        lambda route: route.fulfill(status=404),
-    )
+        search = self.page.locator("#product-search")
+        search.fill("not in the catalogue")
+        self.assertTrue(self.page.locator(".empty-state").is_visible())
+        self.assertIn("No matching fragrances", self.page.locator(".empty-state").inner_text())
+        search.fill("amber")
+        self.assertTrue(card.is_visible())
 
-    page.goto(f"{live_server.url}/")
+        # A later database revision and successful publication must replace
+        # the API fallback without requiring a page reload.
+        product.stock = 0
+        product.description = "Updated after the storage outage."
+        product.save()
+        publication["payload"] = build_catalogue()
+        publication["available"] = True
 
-    card = page.locator(f'.product-card[data-product-id="{product.pk}"]')
-    expect(card).to_be_visible()
-    expect(card.locator(".image-placeholder")).to_be_visible(timeout=10_000)
-    expect(card.locator("img.product-photo")).to_have_count(0)
+        self.page.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
 
-    search = page.locator("#product-search")
-    search.fill("not in the catalogue")
-    expect(page.locator(".empty-state")).to_contain_text("No matching fragrances")
-    search.fill("amber")
-    expect(card).to_be_visible()
+        self.assertTrue(
+            card.locator(".product-description").filter(
+                has_text="Updated after the storage outage."
+            ).is_visible()
+        )
+        self.assertEqual(card.locator(".stock-status").inner_text(), "Out of stock")
 
-    # A later database revision and successful publication must replace the
-    # API fallback with the newly published snapshot without a page reload.
-    product.stock = 0
-    product.description = "Updated after the storage outage."
-    product.save()
-    publication["payload"] = build_catalogue()
-    publication["available"] = True
+    def test_admin_login_password_toggle_and_authentication(self):
+        password = "browser-test-password-123"
+        get_user_model().objects.create_superuser(
+            username="browser-admin",
+            email="browser-admin@example.test",
+            password=password,
+        )
 
-    page.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
+        self.page.goto(f"{self.live_server_url}/admin/login/")
 
-    expect(card.locator(".product-description")).to_have_text(
-        "Updated after the storage outage.",
-        timeout=10_000,
-    )
-    expect(card.locator(".stock-status")).to_have_text("Out of stock")
+        password_input = self.page.locator("#id_password")
+        toggle = self.page.get_by_role("button", name="Show password")
+        self.assertTrue(toggle.is_visible())
 
+        password_input.fill(password)
+        toggle.click()
+        self.assertEqual(password_input.get_attribute("type"), "text")
+        self.assertTrue(self.page.get_by_role("button", name="Hide password").is_visible())
 
-@pytest.mark.django_db(transaction=True)
-def test_admin_login_password_toggle_and_authentication(page, live_server):
-    password = "browser-test-password-123"
-    get_user_model().objects.create_superuser(
-        username="browser-admin",
-        email="browser-admin@example.test",
-        password=password,
-    )
+        self.page.get_by_role("button", name="Hide password").click()
+        self.assertEqual(password_input.get_attribute("type"), "password")
 
-    page.goto(f"{live_server.url}/admin/login/")
+        self.page.locator("#id_username").fill("browser-admin")
+        self.page.locator('input[type="submit"]').click()
 
-    password_input = page.locator("#id_password")
-    toggle = page.get_by_role("button", name="Show password")
-    expect(toggle).to_be_visible()
-
-    password_input.fill(password)
-    toggle.click()
-    expect(password_input).to_have_attribute("type", "text")
-    expect(page.get_by_role("button", name="Hide password")).to_be_visible()
-
-    page.get_by_role("button", name="Hide password").click()
-    expect(password_input).to_have_attribute("type", "password")
-
-    page.locator("#id_username").fill("browser-admin")
-    page.locator('input[type="submit"]').click()
-
-    expect(page).to_have_url(re.compile(r"/admin/$"))
-    expect(page.locator(".nqo-brand-name")).to_contain_text("Ngqo Perfumes")
+        self.page.wait_for_url(re.compile(r".*/admin/$"))
+        self.assertIn("Ngqo Perfumes", self.page.locator(".nqo-brand-name").inner_text())
