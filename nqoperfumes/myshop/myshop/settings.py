@@ -24,9 +24,7 @@ ON_VERCEL = any(
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY") or "dev-only-change-me"
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 
-# Vercel imports Django while building and collecting static assets. Required
-# production secrets are checked by RequireVercelConfigurationMiddleware on
-# incoming requests, not during application import.
+
 def _csv_values(value):
     """Split a comma-separated environment variable into clean values."""
     return [item.strip() for item in (value or "").split(",") if item.strip()]
@@ -189,6 +187,8 @@ AUTHENTICATION_BACKENDS = [
 ]
 AXES_FAILURE_LIMIT = 3
 AXES_COOLOFF_TIME = 1  # hours
+AXES_USE_ATTEMPT_EXPIRATION = True  # Each failed attempt expires after one hour.
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
 AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
 AXES_RESET_ON_SUCCESS = True
 AXES_ENABLE_ACCESS_FAILURE_LOG = True
