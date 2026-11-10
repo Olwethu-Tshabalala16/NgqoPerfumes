@@ -313,21 +313,47 @@ After configuring the services, apply Django migrations and create an administra
 
 ## Tests and continuous integration
 
-Run the backend checks from `nqoperfumes/myshop/`:
+Install the development test dependencies from the repository root:
 
 ```bash
-python manage.py check
-python manage.py test
+python -m pip install -r requirements-dev.txt
 ```
 
-The GitHub Actions workflow also validates the Vercel configuration, checks that `pyproject.toml` and `requirements.txt` dependency lists match, collects static files, checks Python and JavaScript syntax, and runs the automated Django test suite.
-
-To check the frontend JavaScript syntax locally:
+Run the frontend unit tests (Node's built-in test runner):
 
 ```bash
-node --check frontend/app.js
-node --check frontend/config.js
+node --test frontend/tests/*.test.js
 ```
+
+Run the Django backend suite with coverage:
+
+```bash
+cd nqoperfumes/myshop
+coverage run --rcfile=../../.coveragerc manage.py test
+coverage report --rcfile=../../.coveragerc
+coverage xml --rcfile=../../.coveragerc -o coverage.xml
+```
+
+Run the browser-based end-to-end tests from the repository root:
+
+```bash
+python -m playwright install chromium
+pytest -q tests/e2e --browser chromium
+```
+
+The GitHub Actions workflow runs Django checks and tests, frontend unit tests, Playwright browser tests, a 70% backend coverage gate, Python dependency vulnerability auditing with `pip-audit`, Bandit static analysis, and Gitleaks secret scanning. It also validates the Vercel build configuration and verifies that all frontend assets are collected.
+
+### Production merge gate
+
+Configure branch protection for `main` in GitHub and require these checks before merging:
+
+- `NgqoPerfumes CI / quality`
+- `NgqoPerfumes CI / browser-e2e`
+- `NgqoPerfumes CI / security`
+- `NgqoPerfumes CI / secret-scan`
+
+Require pull requests and block force pushes to `main`. The repository's GitHub connection currently does not grant this integration access to the branch-protection administration endpoint, so the repository owner must enable these rules in **Settings → Rules → Rulesets** (or **Settings → Branches**). Until the rules are enabled, CI reports failures but GitHub does not prevent a direct push or merge.
+
 
 ## Deploy to Vercel
 
