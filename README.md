@@ -338,8 +338,10 @@ Run the browser-based end-to-end tests from the repository root:
 
 ```bash
 python -m playwright install chromium
-pytest -q tests/e2e --browser chromium
+python nqoperfumes/myshop/manage.py test tests.e2e --verbosity=2
 ```
+
+The browser tests use Django's live-server test runner and an isolated test database. They do not connect to the production Supabase database or storage.
 
 The GitHub Actions workflow runs Django checks and tests, frontend unit tests, Playwright browser tests, a 70% backend coverage gate, Python dependency vulnerability auditing with `pip-audit`, Bandit static analysis, and Gitleaks secret scanning. It also validates the Vercel build configuration and verifies that all frontend assets are collected.
 
