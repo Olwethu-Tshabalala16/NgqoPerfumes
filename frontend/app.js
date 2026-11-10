@@ -2,6 +2,7 @@
   "use strict";
 
   const config = window.NGQO_CONFIG || {};
+  const catalogueUtils = window.NGQO_CATALOGUE_UTILS;
   const apiBaseUrl = (config.API_BASE_URL || "").replace(/\/+$/, "");
   const productsEndpoint = `${apiBaseUrl}/api/products/`;
   const versionEndpoint = `${apiBaseUrl}/api/products/version/`;
@@ -93,12 +94,7 @@
   }
 
   function formatPrice(value) {
-    const amount = Number(value);
-    if (!Number.isFinite(amount)) return `R ${value}`;
-    return new Intl.NumberFormat("en-ZA", {
-      style: "currency",
-      currency: "ZAR"
-    }).format(amount);
+    return catalogueUtils.formatPrice(value);
   }
 
   function makeProductCard(product) {
@@ -123,7 +119,7 @@
     placeholder.setAttribute("aria-hidden", "true");
     imageFrame.append(placeholder);
 
-    if (product.image_url) {
+    if (catalogueUtils.hasProductImage(product)) {
       const image = element("img", "product-photo");
       image.alt = product.name ? `${product.name} fragrance` : "Fragrance product";
       // Load only the first visible row eagerly; prioritise the first card.
@@ -178,7 +174,7 @@
     dialogStock.className = available ? "stock-status in-stock" : "stock-status out-of-stock";
 
     const imagePlaceholder = productDialog.querySelector(".dialog-image-placeholder");
-    if (product.image_url) {
+    if (catalogueUtils.hasProductImage(product)) {
       dialogImage.alt = product.name ? `${product.name} fragrance` : "Fragrance product";
       dialogImage.classList.remove("is-loaded");
       dialogImage.dataset.imageFailed = "false";
@@ -268,11 +264,7 @@
   }
 
   function filterProducts() {
-    const query = searchInput.value.trim().toLocaleLowerCase();
-    const filtered = products.filter((product) => {
-      const searchable = `${product.name || ""} ${product.description || ""}`.toLocaleLowerCase();
-      return searchable.includes(query);
-    });
+    const filtered = catalogueUtils.filterProducts(products, searchInput.value);
 
     renderProducts(filtered);
     if (query) {
@@ -416,23 +408,6 @@
   }
 
   searchInput.addEventListener("input", filterProducts);
-
-  async function startCatalogue() {
-    try {
-      catalogueVersion = await fetchCatalogueVersion();
-    } catch (error) {
-      console.warn("Initial catalogue version check failed; background checks will retry.", error);
-    }
-
-    await loadProducts();
-    if (catalogueVersion === null) {
-      try {
-        catalogueVersion = await fetchCatalogueVersion();
-      } catch (error) {
-        console.warn("Catalogue version is not available yet.", error);
-      }
-    }
-  }
 
   startCatalogue();
   window.setInterval(checkForCatalogueUpdates, refreshIntervalMs);
