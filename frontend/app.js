@@ -72,7 +72,7 @@
   }
 
   function configureProductImage(image, url, { priority = false, lazy = true } = {}) {
-    image.alt = image.alt || "Fragrance product";
+    image.alt = image.alt || "Product image";
     image.decoding = "async";
     image.fetchPriority = priority ? "high" : "auto";
     revealImageWhenReady(image);
@@ -104,7 +104,7 @@
     card.tabIndex = 0;
     card.setAttribute("role", "button");
     card.setAttribute("aria-haspopup", "dialog");
-    card.setAttribute("aria-label", `View full details for ${product.name || "this fragrance"}`);
+    card.setAttribute("aria-label", `View full details for ${product.name || "this product"}`);
     card.addEventListener("click", () => openProductDetails(product));
     card.addEventListener("keydown", (event) => {
       if (event.target !== card) return;
@@ -121,7 +121,7 @@
 
     if (catalogueUtils.hasProductImage(product)) {
       const image = element("img", "product-photo");
-      image.alt = product.name ? `${product.name} fragrance` : "Fragrance product";
+      image.alt = product.name ? `${product.name} product` : "Product image";
       // Load only the first visible row eagerly; prioritise the first card.
       const firstVisibleRowCount = Math.max(
         1,
@@ -141,11 +141,11 @@
     }
 
     const body = element("div", "product-body");
-    const name = element("h3", "product-name", product.name || "Untitled fragrance");
+    const name = element("h3", "product-name", product.name || "Untitled product");
     const description = element(
       "p",
       "product-description",
-      product.description || "Contact us for more information about this fragrance."
+      product.description || "Contact us for more information about this product."
     );
     const footer = element("div", "product-card-footer");
     const price = element("p", "product-price", formatPrice(product.price));
@@ -165,8 +165,8 @@
 
   function openProductDetails(product) {
     productDialog.dataset.productId = String(product.id);
-    dialogName.textContent = product.name || "Untitled fragrance";
-    dialogDescription.textContent = product.description || "Contact us for more information about this fragrance.";
+    dialogName.textContent = product.name || "Untitled product";
+    dialogDescription.textContent = product.description || "Contact us for more information about this product.";
     dialogPrice.textContent = formatPrice(product.price);
 
     const available = Boolean(product.is_in_stock);
@@ -175,7 +175,7 @@
 
     const imagePlaceholder = productDialog.querySelector(".dialog-image-placeholder");
     if (catalogueUtils.hasProductImage(product)) {
-      dialogImage.alt = product.name ? `${product.name} fragrance` : "Fragrance product";
+      dialogImage.alt = product.name ? `${product.name} product` : "Product image";
       dialogImage.classList.remove("is-loaded");
       dialogImage.dataset.imageFailed = "false";
       dialogImage.hidden = false;
@@ -199,7 +199,7 @@
     if (latestProduct) {
       openProductDetails(latestProduct);
     } else {
-      dialogDescription.textContent = "This fragrance is no longer listed in the catalogue.";
+      dialogDescription.textContent = "This product is no longer listed in the catalogue.";
       dialogStock.textContent = "No longer listed";
       dialogStock.className = "stock-status out-of-stock";
     }
@@ -215,7 +215,7 @@
       const empty = element("div", "empty-state");
       empty.append(
         element("span", "empty-symbol", "✳"),
-        element("h3", "", products.length ? "No matching fragrances" : "The collection is being prepared"),
+        element("h3", "", products.length ? "No matching products" : "The product collection is being prepared"),
         element(
           "p",
           "",
@@ -267,10 +267,11 @@
     const filtered = catalogueUtils.filterProducts(products, searchInput.value);
 
     renderProducts(filtered);
+    const query = searchInput.value.trim();
     if (query) {
-      status.textContent = `${filtered.length} matching fragrance${filtered.length === 1 ? "" : "s"}.`;
+      status.textContent = `${filtered.length} matching product${filtered.length === 1 ? "" : "s"}.`;
     } else {
-      status.textContent = `${products.length} fragrance${products.length === 1 ? "" : "s"} in the collection.`;
+      status.textContent = `${products.length} product${products.length === 1 ? "" : "s"} in the collection.`
     }
   }
 
@@ -294,7 +295,7 @@
   }
 
   async function loadProducts({ silent = false, expectedVersion = null } = {}) {
-    if (!silent && products.length === 0) status.textContent = "Loading fragrances…";
+    if (!silent && products.length === 0) status.textContent = "Loading products…";
 
     let lastError = null;
 
@@ -360,7 +361,7 @@
 
     console.error("Unable to load the product catalogue:", lastError);
     if (!silent && products.length === 0) {
-      status.textContent = "The catalogue could not be loaded.";
+      status.textContent = "Products could not be loaded.";
       const retry = element("button", "retry-button", "Try again");
       retry.type = "button";
       retry.addEventListener("click", () => startCatalogue());
