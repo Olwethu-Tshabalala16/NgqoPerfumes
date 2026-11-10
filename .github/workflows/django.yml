@@ -118,6 +118,7 @@ jobs:
   browser-e2e:
     name: browser-e2e
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: quality
     env:
       DJANGO_SECRET_KEY: ci-only-secret-key
