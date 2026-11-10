@@ -5,12 +5,30 @@ import json
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.base import ContentFile
+from django.db.models import Count, Max
 from django.utils import timezone
 
 from .models import Product
 from .storage import SupabaseS3Storage
 
 CATALOGUE_OBJECT_KEY = "catalogue/products.json"
+
+
+def get_catalogue_revision():
+    """Return the database revision shared by the API and published snapshot."""
+    summary = Product.objects.aggregate(
+        count=Count("pk"),
+        latest_updated_at=Max("updated_at"),
+        latest_id=Max("pk"),
+    )
+    latest_updated_at = summary["latest_updated_at"]
+    return ":".join(
+        (
+            str(summary["count"]),
+            str(summary["latest_id"] or 0),
+            latest_updated_at.isoformat() if latest_updated_at else "empty",
+        )
+    )
 
 
 def build_catalogue():
@@ -34,6 +52,7 @@ def build_catalogue():
 
     return {
         "version": 1,
+        "revision": get_catalogue_revision(),
         "updated_at": timezone.now().isoformat(),
         "count": len(results),
         "products": results,
@@ -56,8 +75,6 @@ def publish_catalogue():
         )
 
     payload = json.dumps(build_catalogue(), ensure_ascii=False, indent=2).encode("utf-8")
-    # Override only for this fixed object key. Product images keep their own
-    # caching policy, while the catalogue must always reflect the latest save/delete.
     storage = SupabaseS3Storage(file_overwrite=True)
     storage.object_parameters = {
         "CacheControl": "no-store, no-cache, max-age=0, must-revalidate",
