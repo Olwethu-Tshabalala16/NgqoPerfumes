@@ -32,31 +32,39 @@ def get_catalogue_revision():
 
 
 def build_catalogue():
-    """Build a portable JSON snapshot of all products and their public image URLs."""
-    results = []
-    for product in Product.objects.all().order_by("-created_at", "-pk"):
-        image_url = product.image.url if product.image else None
-        results.append(
-            {
-                "id": product.pk,
-                "name": product.name,
-                "description": product.description,
-                "price": str(product.price),
-                "stock": product.stock,
-                "is_in_stock": product.is_in_stock(),
-                "image_url": image_url,
-                "created_at": product.created_at.isoformat() if product.created_at else None,
-                "updated_at": product.updated_at.isoformat() if product.updated_at else None,
-            }
-        )
+    """Build a snapshot whose revision matches the products included in it."""
+    for _attempt in range(3):
+        revision_before = get_catalogue_revision()
+        products = list(Product.objects.all().order_by("-created_at", "-pk"))
+        results = []
 
-    return {
-        "version": 1,
-        "revision": get_catalogue_revision(),
-        "updated_at": timezone.now().isoformat(),
-        "count": len(results),
-        "products": results,
-    }
+        for product in products:
+            image_url = product.image.url if product.image else None
+            results.append(
+                {
+                    "id": product.pk,
+                    "name": product.name,
+                    "description": product.description,
+                    "price": str(product.price),
+                    "stock": product.stock,
+                    "is_in_stock": product.is_in_stock(),
+                    "image_url": image_url,
+                    "created_at": product.created_at.isoformat() if product.created_at else None,
+                    "updated_at": product.updated_at.isoformat() if product.updated_at else None,
+                }
+            )
+
+        revision_after = get_catalogue_revision()
+        if revision_before == revision_after:
+            return {
+                "version": 1,
+                "revision": revision_after,
+                "updated_at": timezone.now().isoformat(),
+                "count": len(results),
+                "products": results,
+            }
+
+    raise RuntimeError("The product catalogue changed repeatedly while a snapshot was being built.")
 
 
 def publish_catalogue():
