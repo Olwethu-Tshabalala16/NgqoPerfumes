@@ -96,6 +96,10 @@ class CataloguePublishingTests(TestCase):
         from .catalogue import build_catalogue
 
         payload = build_catalogue()
+        self.assertEqual(
+            payload["revision"],
+            self.client.get(reverse("store:product_catalogue_version_api")).json()["version"],
+        )
         self.assertEqual(payload["count"], 1)
         self.assertEqual(len(payload["products"]), 1)
         self.assertEqual(
@@ -169,7 +173,8 @@ class ProductImageCleanupTests(TestCase):
         image_storage = Product._meta.get_field("image").storage
 
         with patch.object(image_storage, "delete") as delete_image:
-            product.delete()
+            with self.captureOnCommitCallbacks(execute=True):
+                product.delete()
 
         delete_image.assert_called_once_with("products/orphan.jpg")
 
@@ -187,12 +192,62 @@ class ProductImageCleanupTests(TestCase):
         image_storage = Product._meta.get_field("image").storage
 
         with patch.object(image_storage, "delete") as delete_image:
-            first.delete()
-            delete_image.assert_not_called()
-
-            second.delete()
+            with self.captureOnCommitCallbacks(execute=True):
+                first.delete()
+                delete_image.assert_not_called()
+                second.delete()
 
         delete_image.assert_called_once_with("products/shared.jpg")
+
+    def test_replacing_product_image_removes_old_unreferenced_image_after_commit(self):
+        product = Product.objects.create(
+            name="Image replacement",
+            price=Decimal("100.00"),
+            image="products/old.jpg",
+        )
+        image_storage = Product._meta.get_field("image").storage
+
+        with patch.object(image_storage, "delete") as delete_image:
+            with self.captureOnCommitCallbacks(execute=True):
+                product.image = "products/new.jpg"
+                product.save()
+
+        delete_image.assert_called_once_with("products/old.jpg")
+
+    def test_replacing_image_keeps_old_image_when_another_product_references_it(self):
+        first = Product.objects.create(
+            name="First product",
+            price=Decimal("100.00"),
+            image="products/shared-old.jpg",
+        )
+        Product.objects.create(
+            name="Second product",
+            price=Decimal("120.00"),
+            image="products/shared-old.jpg",
+        )
+        image_storage = Product._meta.get_field("image").storage
+
+        with patch.object(image_storage, "delete") as delete_image:
+            with self.captureOnCommitCallbacks(execute=True):
+                first.image = "products/replacement.jpg"
+                first.save()
+
+        delete_image.assert_not_called()
+
+    def test_saving_without_changing_image_does_not_delete_it(self):
+        product = Product.objects.create(
+            name="Unchanged image",
+            price=Decimal("100.00"),
+            image="products/keep.jpg",
+        )
+        image_storage = Product._meta.get_field("image").storage
+
+        with patch.object(image_storage, "delete") as delete_image:
+            with self.captureOnCommitCallbacks(execute=True):
+                product.name = "Updated name"
+                product.save()
+
+        delete_image.assert_not_called()
 
 
 class SupabaseStorageTests(TestCase):
