@@ -16,6 +16,9 @@
 {% block extrastyle %}{{ block.super }}
 <link rel="stylesheet" href="{% static 'admin/nqo-admin.css' %}">
 {% endblock %}
+{% block extrahead %}{{ block.super }}
+<script src="{% static 'admin/password-toggle.js' %}" defer></script>
+{% endblock %}
 {% block branding %}
 <div class="nqo-branding">
   <div class="nqo-theme-controls">
