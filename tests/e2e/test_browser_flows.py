@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 from store.catalogue import build_catalogue
 from store.models import Product
@@ -80,16 +80,15 @@ class StorefrontBrowserTests(StaticLiveServerTestCase):
         self.page.goto(f"{self.live_server_url}/")
 
         card = self.page.locator(f'.product-card[data-product-id="{product.pk}"]')
-        self.assertTrue(card.is_visible())
-        self.assertTrue(card.locator(".image-placeholder").is_visible())
-        self.assertEqual(card.locator("img.product-photo").count(), 0)
+        expect(card).to_be_visible()
+        expect(card.locator(".image-placeholder")).to_be_visible(timeout=10_000)
+        expect(card.locator("img.product-photo")).to_have_count(0)
 
         search = self.page.locator("#product-search")
         search.fill("not in the catalogue")
-        self.assertTrue(self.page.locator(".empty-state").is_visible())
-        self.assertIn("No matching fragrances", self.page.locator(".empty-state").inner_text())
+        expect(self.page.locator(".empty-state")).to_contain_text("No matching fragrances")
         search.fill("amber")
-        self.assertTrue(card.is_visible())
+        expect(card).to_be_visible()
 
         # A later database revision and successful publication must replace
         # the API fallback without requiring a page reload.
@@ -101,12 +100,11 @@ class StorefrontBrowserTests(StaticLiveServerTestCase):
 
         self.page.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
 
-        self.assertTrue(
-            card.locator(".product-description").filter(
-                has_text="Updated after the storage outage."
-            ).is_visible()
+        expect(card.locator(".product-description")).to_have_text(
+            "Updated after the storage outage.",
+            timeout=10_000,
         )
-        self.assertEqual(card.locator(".stock-status").inner_text(), "Out of stock")
+        expect(card.locator(".stock-status")).to_have_text("Out of stock")
 
     def test_admin_login_password_toggle_and_authentication(self):
         password = "browser-test-password-123"
@@ -120,18 +118,18 @@ class StorefrontBrowserTests(StaticLiveServerTestCase):
 
         password_input = self.page.locator("#id_password")
         toggle = self.page.get_by_role("button", name="Show password")
-        self.assertTrue(toggle.is_visible())
+        expect(toggle).to_be_visible()
 
         password_input.fill(password)
         toggle.click()
-        self.assertEqual(password_input.get_attribute("type"), "text")
-        self.assertTrue(self.page.get_by_role("button", name="Hide password").is_visible())
+        expect(password_input).to_have_attribute("type", "text")
+        expect(self.page.get_by_role("button", name="Hide password")).to_be_visible()
 
         self.page.get_by_role("button", name="Hide password").click()
-        self.assertEqual(password_input.get_attribute("type"), "password")
+        expect(password_input).to_have_attribute("type", "password")
 
         self.page.locator("#id_username").fill("browser-admin")
         self.page.locator('input[type="submit"]').click()
 
         self.page.wait_for_url(re.compile(r".*/admin/$"))
-        self.assertIn("Ngqo Perfumes", self.page.locator(".nqo-brand-name").inner_text())
+        expect(self.page.locator(".nqo-brand-name")).to_contain_text("Ngqo Perfumes")
