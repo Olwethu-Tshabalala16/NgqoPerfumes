@@ -1,0 +1,12 @@
+-r requirements.txt
+
+# Automated test tooling
+coverage>=7.6,<8
+playwright>=1.55,<2
+pytest>=8.3,<10
+pytest-django>=4.9,<5
+pytest-playwright>=0.7,<1
+
+# Static security analysis
+bandit>=1.8,<2
+pip-audit>=2.7,<3
