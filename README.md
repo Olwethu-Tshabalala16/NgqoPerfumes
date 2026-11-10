@@ -343,16 +343,16 @@ python nqoperfumes/myshop/manage.py test tests.e2e.test_browser_flows --verbosit
 
 The browser tests use Django's live-server test runner and an isolated test database. They do not connect to the production Supabase database or storage.
 
-The GitHub Actions workflow runs Django checks and tests, frontend unit tests, Playwright browser tests, a 70% backend coverage gate, Python dependency vulnerability auditing with `pip-audit`, Bandit static analysis, and Gitleaks secret scanning. It also validates the Vercel build configuration and verifies that all frontend assets are collected.
+The GitHub Actions workflow runs Django checks and tests, frontend unit tests, Playwright browser tests, a 80% backend coverage gate, Python dependency vulnerability auditing with `pip-audit`, Bandit static analysis, and Gitleaks secret scanning. It also validates the Vercel build configuration and verifies that all frontend assets are collected.
 
 ### Production merge gate
 
 Configure branch protection for `main` in GitHub and require these checks before merging:
 
-- `NgqoPerfumes CI / quality`
-- `NgqoPerfumes CI / browser-e2e`
-- `NgqoPerfumes CI / security`
-- `NgqoPerfumes CI / secret-scan`
+- `quality`
+- `browser-e2e`
+- `security`
+- `secret-scan`
 
 Require pull requests and block force pushes to `main`. The repository's GitHub connection currently does not grant this integration access to the branch-protection administration endpoint, so the repository owner must enable these rules in **Settings → Rules → Rulesets** (or **Settings → Branches**). Until the rules are enabled, CI reports failures but GitHub does not prevent a direct push or merge.
 

@@ -103,7 +103,7 @@ jobs:
         working-directory: nqoperfumes/myshop
         run: |
           coverage run --rcfile=../../.coveragerc manage.py test
-          coverage report --rcfile=../../.coveragerc --fail-under=70
+          coverage report --rcfile=../../.coveragerc --fail-under=80
           coverage xml --rcfile=../../.coveragerc -o coverage.xml
 
       - name: Upload coverage report
