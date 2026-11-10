@@ -141,6 +141,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
+      - name: Collect static assets for the live-server browser tests
+        working-directory: nqoperfumes/myshop
+        run: python manage.py collectstatic --noinput
+
       - name: Install Playwright Chromium and operating-system dependencies
         run: python -m playwright install --with-deps chromium
 
