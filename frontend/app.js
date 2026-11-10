@@ -301,34 +301,33 @@
     return payload.version;
   }
 
-  async function loadProducts({ silent = false } = {}) {
+  async function loadProducts({ silent = false, expectedVersion = null } = {}) {
     if (!silent && products.length === 0) status.textContent = "Loading fragrances…";
 
-    const sources = catalogueJsonUrl
-      ? [catalogueJsonUrl, productsEndpoint]
-      : [productsEndpoint];
     let lastError = null;
 
-    for (const source of sources) {
+    // A published snapshot is safe to use only when its revision matches the
+    // database revision endpoint. A mismatch means it is stale: use Django.
+    if (catalogueJsonUrl && expectedVersion !== null) {
       try {
-        const catalogueRequestUrl = new URL(source, window.location.href);
-        catalogueRequestUrl.searchParams.set("v", String(Date.now()));
-        const response = await fetch(catalogueRequestUrl.toString(), {
+        const snapshotUrl = new URL(catalogueJsonUrl, window.location.href);
+        snapshotUrl.searchParams.set("v", String(Date.now()));
+        const response = await fetch(snapshotUrl.toString(), {
           headers: { Accept: "application/json" },
           cache: "no-store"
         });
 
         if (!response.ok) {
-          throw new Error(`The catalogue service returned HTTP ${response.status}.`);
+          throw new Error(`The published catalogue returned HTTP ${response.status}.`);
         }
 
         const payload = await response.json();
-        const items = Array.isArray(payload.products)
-          ? payload.products
-          : (Array.isArray(payload.results) ? payload.results : null);
-
+        const items = Array.isArray(payload.products) ? payload.products : null;
         if (!items) {
-          throw new Error("The catalogue response has an unexpected format.");
+          throw new Error("The published catalogue has an unexpected format.");
+        }
+        if (payload.revision !== expectedVersion) {
+          throw new Error("The published catalogue is stale; loading the database API instead.");
         }
 
         products = items;
@@ -337,8 +336,34 @@
         return true;
       } catch (error) {
         lastError = error;
-        console.warn(`Catalogue source failed (${source}); trying the next source if available.`, error);
+        console.warn("Published catalogue unavailable or stale; falling back to Django API.", error);
       }
+    }
+
+    try {
+      const apiUrl = new URL(productsEndpoint, window.location.href);
+      apiUrl.searchParams.set("v", String(Date.now()));
+      const response = await fetch(apiUrl.toString(), {
+        headers: { Accept: "application/json" },
+        cache: "no-store"
+      });
+
+      if (!response.ok) {
+        throw new Error(`The Django catalogue API returned HTTP ${response.status}.`);
+      }
+
+      const payload = await response.json();
+      const items = Array.isArray(payload.results) ? payload.results : null;
+      if (!items) {
+        throw new Error("The Django catalogue API response has an unexpected format.");
+      }
+
+      products = items;
+      filterProducts();
+      refreshOpenProductDetails();
+      return true;
+    } catch (error) {
+      lastError = error;
     }
 
     console.error("Unable to load the product catalogue:", lastError);
@@ -346,7 +371,7 @@
       status.textContent = "The catalogue could not be loaded.";
       const retry = element("button", "retry-button", "Try again");
       retry.type = "button";
-      retry.addEventListener("click", () => loadProducts());
+      retry.addEventListener("click", () => startCatalogue());
       grid.replaceChildren(
         element("p", "error-message", "Check your connection and the catalogue configuration, then try again."),
         retry
@@ -361,10 +386,11 @@
 
     try {
       const latestVersion = await fetchCatalogueVersion();
-      if (catalogueVersion === null) {
-        catalogueVersion = latestVersion;
-      } else if (latestVersion !== catalogueVersion) {
-        const refreshed = await loadProducts({ silent: true });
+      if (catalogueVersion === null || latestVersion !== catalogueVersion) {
+        const refreshed = await loadProducts({
+          silent: products.length > 0,
+          expectedVersion: latestVersion
+        });
         if (refreshed) catalogueVersion = latestVersion;
       }
     } catch (error) {
@@ -372,6 +398,20 @@
       console.warn("Catalogue update check failed; the current catalogue remains available.", error);
     } finally {
       checkingForUpdates = false;
+    }
+  }
+
+  async function startCatalogue() {
+    let expectedVersion = null;
+    try {
+      expectedVersion = await fetchCatalogueVersion();
+    } catch (error) {
+      console.warn("Initial catalogue revision check failed; using the Django API.", error);
+    }
+
+    const loaded = await loadProducts({ expectedVersion });
+    if (loaded && expectedVersion !== null) {
+      catalogueVersion = expectedVersion;
     }
   }
 
