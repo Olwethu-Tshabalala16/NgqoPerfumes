@@ -138,10 +138,36 @@ class StorefrontBrowserTests(StaticLiveServerTestCase):
         )
 
         def browser_flow(page):
+            failed_requests = []
+            page.on(
+                "requestfailed",
+                lambda request: failed_requests.append({
+                    "url": request.url,
+                    "failure": request.failure,
+                }),
+            )
             page.goto(f"{self.live_server_url}/admin/login/")
 
             password_input = page.locator("#id_password")
             toggle = page.get_by_role("button", name="Show password")
+            if toggle.count() == 0:
+                diagnostics = page.evaluate("""() => ({
+                    bodyClass: document.body.className,
+                    passwordFields: [...document.querySelectorAll('input')].map((input) => ({
+                        id: input.id,
+                        name: input.name,
+                        type: input.type,
+                        parent: input.parentElement?.outerHTML
+                    })),
+                    passwordScripts: [...document.scripts]
+                        .map((script) => script.src)
+                        .filter((src) => src.includes('password-toggle')),
+                    readyState: document.readyState
+                })""")
+                raise AssertionError(
+                    "Admin password toggle missing. "
+                    f"DOM={diagnostics!r}; failedRequests={failed_requests!r}"
+                )
             expect(toggle).to_be_visible()
 
             password_input.fill(password)
