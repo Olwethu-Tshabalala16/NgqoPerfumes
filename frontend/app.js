@@ -32,6 +32,66 @@
     return node;
   }
 
+
+  // Use native lazy loading where available; fall back to IntersectionObserver
+  // without downloading off-screen images prematurely.
+  const supportsNativeLazyLoading = "loading" in HTMLImageElement.prototype;
+  const imageObserver = !supportsNativeLazyLoading && "IntersectionObserver" in window
+    ? new IntersectionObserver((entries, observer) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          const image = entry.target;
+          image.src = image.dataset.src;
+          image.removeAttribute("data-src");
+          observer.unobserve(image);
+        });
+      }, { rootMargin: "300px 0px" })
+    : null;
+
+  function revealImageWhenReady(image) {
+    const reveal = async () => {
+      if (image.dataset.imageFailed === "true") return;
+      try {
+        if (typeof image.decode === "function") await image.decode();
+      } catch {
+        // A failed decode is handled by the error listener below.
+        if (!image.naturalWidth) return;
+      }
+      image.classList.add("is-loaded");
+    };
+
+    image.addEventListener("load", reveal, { once: true });
+    image.addEventListener("error", () => {
+      image.dataset.imageFailed = "true";
+      image.classList.remove("is-loaded");
+    }, { once: true });
+
+    // Cached images may finish before the load listener is attached.
+    if (image.complete && image.naturalWidth > 0) reveal();
+  }
+
+  function configureProductImage(image, url, { priority = false, lazy = true } = {}) {
+    image.alt = image.alt || "Fragrance product";
+    image.decoding = "async";
+    image.fetchPriority = priority ? "high" : "auto";
+    revealImageWhenReady(image);
+
+    if (!lazy) {
+      image.loading = "eager";
+      image.src = url;
+    } else if (supportsNativeLazyLoading) {
+      image.loading = "lazy";
+      image.src = url;
+    } else if (imageObserver) {
+      image.dataset.src = url;
+      imageObserver.observe(image);
+    } else {
+      // Very old browsers without either API: prefer a reliable eager load.
+      image.loading = "eager";
+      image.src = url;
+    }
+  }
+
   function formatPrice(value) {
     const amount = Number(value);
     if (!Number.isFinite(amount)) return `R ${value}`;
@@ -65,10 +125,17 @@
 
     if (product.image_url) {
       const image = element("img", "product-photo");
-      image.src = product.image_url;
       image.alt = product.name ? `${product.name} fragrance` : "Fragrance product";
-      image.loading = "lazy";
-      image.decoding = "async";
+      // Load only the first visible row eagerly; prioritise the first card.
+      const firstVisibleRowCount = Math.max(
+        1,
+        Math.floor(getComputedStyle(grid).gridTemplateColumns.split(" ").length)
+      );
+      const isInitiallyVisible = products.indexOf(product) < firstVisibleRowCount;
+      configureProductImage(image, product.image_url, {
+        lazy: !isInitiallyVisible,
+        priority: products.indexOf(product) === 0
+      });
       image.addEventListener("error", () => {
         image.remove();
         placeholder.hidden = false;
@@ -112,9 +179,11 @@
 
     const imagePlaceholder = productDialog.querySelector(".dialog-image-placeholder");
     if (product.image_url) {
-      dialogImage.src = product.image_url;
       dialogImage.alt = product.name ? `${product.name} fragrance` : "Fragrance product";
+      dialogImage.classList.remove("is-loaded");
+      dialogImage.dataset.imageFailed = "false";
       dialogImage.hidden = false;
+      configureProductImage(dialogImage, product.image_url, { lazy: false, priority: true });
       if (imagePlaceholder) imagePlaceholder.hidden = true;
     } else {
       dialogImage.removeAttribute("src");
