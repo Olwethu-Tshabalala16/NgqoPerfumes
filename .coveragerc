@@ -1,0 +1,11 @@
+[run]
+source = store
+omit =
+    */tests.py
+    */test_*.py
+    */migrations/*
+    */apps.py
+
+[report]
+show_missing = True
+skip_covered = True
