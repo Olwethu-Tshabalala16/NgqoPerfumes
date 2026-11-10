@@ -338,7 +338,7 @@ Run the browser-based end-to-end tests from the repository root:
 
 ```bash
 python -m playwright install chromium
-python nqoperfumes/myshop/manage.py test tests.e2e --verbosity=2
+python nqoperfumes/myshop/manage.py test tests.e2e.test_browser_flows --verbosity=2
 ```
 
 The browser tests use Django's live-server test runner and an isolated test database. They do not connect to the production Supabase database or storage.
