@@ -1,4 +1,4 @@
-# Ngqo Perfumes
+# Ngqo Enterprises
 
 A Django-powered digital fragrance catalogue built to solve a real problem for a small family perfume business.
 
@@ -8,7 +8,7 @@ A Django-powered digital fragrance catalogue built to solve a real problem for a
   <a href="https://github.com/Olwethu-Tshabalala16/NgqoPerfumes"><strong>Source code</strong></a>
 </p>
 
-Ngqo Perfumes replaces a manually shared product catalogue with a single, shareable website. Customers can browse fragrances, search the collection, view product details, prices, availability and product images. Product information is managed through Django Admin, while Supabase provides persistent database and object-storage infrastructure.
+Ngqo Enterprises replaces a manually shared product catalogue with a single, shareable website. Customers can browse fragrances, search the collection, view product details, prices, availability and product images. Product information is managed through Django Admin, while Supabase provides persistent database and object-storage infrastructure.
 
 > **Project status:** Deployed on Vercel. The current scope is a product catalogue with administrative product management; it is not yet a complete e-commerce checkout or payment platform.
 
@@ -34,7 +34,7 @@ Ngqo Perfumes replaces a manually shared product catalogue with a single, sharea
 
 ## Overview
 
-The project began with a practical problem. My mother was running a small perfume business and relied on printed or manually shared catalogues to show customers the available products. I built Ngqo Perfumes to make that catalogue accessible through one link.
+The project began with a practical problem. My mother was running a small perfume business and relied on printed or manually shared catalogues to show customers the available products. I built Ngqo Enterprises to make that catalogue accessible through one link.
 
 The application has since developed into a small full-stack system. It combines a Django application, a relational database, object storage, a static customer-facing interface and a deployment pipeline.
 
@@ -294,7 +294,7 @@ The Vercel build script generates `frontend/config.js` from `SUPABASE_URL` and `
 
 ## Database and storage setup
 
-Ngqo Perfumes uses two Supabase services:
+Ngqo Enterprises uses two Supabase services:
 
 ### PostgreSQL
 
