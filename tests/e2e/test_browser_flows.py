@@ -194,7 +194,7 @@ class StorefrontBrowserTests(StaticLiveServerTestCase):
             page.locator('input[type="submit"]').click()
 
             page.wait_for_url(re.compile(r".*/admin/$"))
-            expect(page.locator(".nqo-brand-name")).to_contain_text("Ngqo Perfumes")
+            expect(page.locator(".nqo-brand-name")).to_contain_text("Ngqo Enterprises")
 
         thread, result = self.run_browser_action(browser_flow)
         self.finish_browser_action(thread, result)
