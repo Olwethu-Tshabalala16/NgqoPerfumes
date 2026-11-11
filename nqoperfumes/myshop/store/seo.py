@@ -1,4 +1,4 @@
-"""Search-engine discovery endpoints for the public Ngqo Perfumes site."""
+"""Search-engine discovery endpoints for the public Ngqo Enterprises site."""
 
 from django.http import HttpResponse
 
