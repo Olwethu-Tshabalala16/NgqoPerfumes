@@ -33,7 +33,7 @@ class RequireVercelConfigurationMiddleware:
                     {
                         "status": "configuration_error",
                         "message": (
-                            "Ngqo Perfumes is deployed, but required production "
+                            "Ngqo Enterprises is deployed, but required production "
                             "environment variables are missing."
                         ),
                         "missing_environment_variables": missing,
