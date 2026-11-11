@@ -25,9 +25,10 @@ def sitemap_xml(request):
 
 
 def robots_txt(request):
-    """Allow public pages while keeping admin and API endpoints out of crawling."""
+    """Allow public pages and catalogue data while keeping admin/API paths private."""
     content = f"""User-agent: *
 Allow: /
+Allow: /api/products/
 Disallow: /admin/
 Disallow: /api/
 
