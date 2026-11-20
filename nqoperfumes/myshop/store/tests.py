@@ -299,6 +299,15 @@ class AdminDashboardTests(TestCase):
         )
         self.client.force_login(self.admin_user)
 
+    def test_product_admin_form_renders_category_dropdown_and_quick_add_control(self):
+        response = self.client.get(reverse("admin:store_product_add"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="id_category"')
+        self.assertContains(response, "+ Add Section")
+        self.assertContains(response, 'id="nqo-category-dialog"')
+        self.assertContains(response, 'data-add-category-url="/admin/store/product/add-category/"')
+
     def test_product_form_can_create_category_without_leaving_the_form(self):
         response = self.client.post(
             reverse("admin:store_product_add_category"),
