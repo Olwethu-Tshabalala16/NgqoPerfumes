@@ -169,7 +169,7 @@ class CataloguePublishingTests(TestCase):
         self.assertEqual(
             storage.object_parameters,
             {
-                "CacheControl": "no-store, no-cache, max-age=0, must-revalidate",
+                "CacheControl": "public, max-age=30, s-maxage=60, stale-while-revalidate=120",
                 "ContentType": "application/json",
             },
         )
