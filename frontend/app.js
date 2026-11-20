@@ -146,9 +146,23 @@
     return catalogueUtils.formatPrice(value);
   }
 
+  function productPageUrl(product) {
+    if (typeof product.url === "string" && product.url.startsWith("/products/")) {
+      return product.url;
+    }
+    const slug = String(product.name || "product")
+      .normalize("NFKD")
+      .replace(/[\\u0300-\\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "product";
+    return `/products/${encodeURIComponent(product.id)}/${slug}/`;
+  }
+
   function makeProductCard(product) {
     const card = element("a", "product-card");
-    card.href = product.url || `/products/${encodeURIComponent(product.id)}/product/`;
+    card.href = productPageUrl(product);
     card.dataset.productId = String(product.id);
     card.dataset.productSignature = JSON.stringify(product);
 
