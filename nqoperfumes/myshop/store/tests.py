@@ -325,6 +325,12 @@ class AdminDashboardTests(TestCase):
         self.assertContains(response, 'id="nqo-category-dialog"')
         self.assertContains(response, 'data-add-category-url="/admin/store/product/add-category/"')
 
+    def test_product_category_endpoint_rejects_non_post_requests(self):
+        response = self.client.get(reverse("admin:store_product_add_category"))
+
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response["Allow"], "POST")
+
     def test_product_form_can_create_category_without_leaving_the_form(self):
         response = self.client.post(
             reverse("admin:store_product_add_category"),
