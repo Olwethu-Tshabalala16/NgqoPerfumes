@@ -22,7 +22,7 @@
   const dialogStock = document.querySelector("#dialog-product-stock");
   const dialogClose = document.querySelector("#dialog-close");
   let products = [];
-  let selectedCategory = "";
+  let selectedCategory = "__all_perfumes__";
   let catalogueVersion = null;
   let checkingForUpdates = false;
 
@@ -268,43 +268,38 @@
     existingCards.forEach((staleCard) => staleCard.remove());
   }
 
+  const perfumeCategoryNames = new Set(["Arthur Ford", "Villa", "Fine Perfumes"]);
+  const perfumeSections = [
+    { key: "__all_perfumes__", title: "All Perfumes", kicker: "THE FULL PERFUME COLLECTION" },
+    { key: "Arthur Ford", title: "Arthur Ford", kicker: "SHOP BY BRAND" },
+    { key: "Villa", title: "Villa", kicker: "SHOP BY BRAND" },
+    { key: "Fine Perfumes", title: "Fine Perfumes", kicker: "SHOP BY SECTION" }
+  ];
+
+  function getPerfumeProducts() {
+    return products.filter((product) => perfumeCategoryNames.has(String(product.category || "").trim()));
+  }
+
   function renderCategoryFilters() {
     if (!categoryGrid) return;
-    const counts = new Map();
-    products.forEach((product) => {
-      const category = String(product.category || "").trim();
-      if (category) counts.set(category, (counts.get(category) || 0) + 1);
-    });
-
-    const categories = [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
-    if (selectedCategory && !counts.has(selectedCategory)) selectedCategory = "";
-
+    const perfumeProducts = getPerfumeProducts();
     const buttons = [];
-    const allButton = element("button", `category-card${selectedCategory ? "" : " is-active"}`);
-    allButton.type = "button";
-    allButton.setAttribute("aria-pressed", String(!selectedCategory));
-    allButton.append(
-      element("span", "category-card-kicker", "THE FULL COLLECTION"),
-      element("strong", "category-card-title", "All fragrances"),
-      element("span", "category-card-count", `${products.length} products`)
-    );
-    allButton.addEventListener("click", () => {
-      selectedCategory = "";
-      filterProducts();
-    });
-    buttons.push(allButton);
 
-    categories.forEach(([category, count]) => {
-      const button = element("button", `category-card${selectedCategory === category ? " is-active" : ""}`);
+    perfumeSections.forEach((section) => {
+      const count = section.key === "__all_perfumes__"
+        ? perfumeProducts.length
+        : perfumeProducts.filter((product) => String(product.category || "").trim() === section.key).length;
+      const active = selectedCategory === section.key;
+      const button = element("button", `category-card${active ? " is-active" : ""}`);
       button.type = "button";
-      button.setAttribute("aria-pressed", String(selectedCategory === category));
+      button.setAttribute("aria-pressed", String(active));
       button.append(
-        element("span", "category-card-kicker", "SHOP BY SECTION"),
-        element("strong", "category-card-title", category),
+        element("span", "category-card-kicker", section.kicker),
+        element("strong", "category-card-title", section.title),
         element("span", "category-card-count", `${count} product${count === 1 ? "" : "s"}`)
       );
       button.addEventListener("click", () => {
-        selectedCategory = category;
+        selectedCategory = section.key;
         filterProducts();
       });
       buttons.push(button);
@@ -315,20 +310,18 @@
 
   function filterProducts() {
     renderCategoryFilters();
-    const searched = catalogueUtils.filterProducts(products, searchInput.value);
-    const filtered = selectedCategory
-      ? searched.filter((product) => String(product.category || "").trim() === selectedCategory)
-      : searched;
+    const searched = catalogueUtils.filterProducts(getPerfumeProducts(), searchInput.value);
+    const filtered = selectedCategory === "__all_perfumes__"
+      ? searched
+      : searched.filter((product) => String(product.category || "").trim() === selectedCategory);
 
     renderProducts(filtered);
     const query = searchInput.value.trim();
-    const categoryLabel = selectedCategory ? ` in ${selectedCategory}` : "";
+    const categoryLabel = selectedCategory === "__all_perfumes__" ? " in All Perfumes" : ` in ${selectedCategory}`;
     if (query) {
       status.textContent = `${filtered.length} matching product${filtered.length === 1 ? "" : "s"}${categoryLabel}.`;
-    } else if (selectedCategory) {
-      status.textContent = `${filtered.length} product${filtered.length === 1 ? "" : "s"} in ${selectedCategory}.`;
     } else {
-      status.textContent = `${products.length} product${products.length === 1 ? "" : "s"} in the collection.`;
+      status.textContent = `${filtered.length} product${filtered.length === 1 ? "" : "s"}${categoryLabel}.`;
     }
   }
 
