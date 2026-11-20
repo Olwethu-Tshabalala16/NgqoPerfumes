@@ -427,3 +427,20 @@ button, input { font: inherit; }
 html[data-theme="dark"] .category-card { background: #211F1C; color: var(--ink); border-color: var(--line); }
 html[data-theme="dark"] .category-card.is-active { background: #30291F; border-color: var(--gold); }
 @media (max-width: 520px) { .category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; } .category-card { min-height: 120px; padding: .85rem; } .category-card-title { font-size: 1.05rem; } }
+
+
+/* Server-rendered product cards are links to their own detail pages. */
+a.product-card { color: inherit; text-decoration: none; }
+a.product-card:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.product-detail-section { max-width: 1180px; margin: 0 auto; padding: clamp(2.5rem, 6vw, 5rem) clamp(1.25rem, 5vw, 5rem); }
+.product-detail-back { display: inline-flex; margin-bottom: 1.5rem; color: var(--gold-deep); font-size: .9rem; font-weight: 700; text-decoration: none; }
+.product-detail-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(2rem, 5vw, 4rem); align-items: start; }
+.product-detail-image { display: grid; min-height: 24rem; aspect-ratio: 1 / 1; place-items: center; overflow: hidden; background: linear-gradient(135deg, var(--image-start), var(--image-end)); }
+.product-detail-image img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.product-detail-copy { padding: 1rem 0; }
+.product-detail-copy h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.2rem, 5vw, 3.8rem); font-weight: 500; line-height: 1.08; }
+.product-detail-description { margin: 1.4rem 0 2rem; color: var(--muted); line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.product-detail-meta { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1.2rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.product-detail-meta .product-price { font-size: 1.5rem; }
+.product-detail-category { display: inline-flex; margin-bottom: .9rem; padding: .3rem .7rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: .75rem; }
+@media (max-width: 700px) { .product-detail-layout { grid-template-columns: 1fr; } .product-detail-image { min-height: 16rem; max-height: 28rem; } }

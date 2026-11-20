@@ -35,9 +35,16 @@
   const dialogPrice = document.querySelector("#dialog-product-price");
   const dialogStock = document.querySelector("#dialog-product-stock");
   const dialogClose = document.querySelector("#dialog-close");
-  let products = [];
+  const initialCatalogueNode = document.querySelector("#initial-catalogue-data");
+  let initialCatalogue = null;
+  try {
+    initialCatalogue = initialCatalogueNode ? JSON.parse(initialCatalogueNode.textContent) : null;
+  } catch {
+    initialCatalogue = null;
+  }
+  let products = Array.isArray(initialCatalogue?.products) ? initialCatalogue.products : [];
   let selectedCategory = "__all_perfumes__";
-  let catalogueVersion = null;
+  let catalogueVersion = typeof initialCatalogue?.revision === "string" ? initialCatalogue.revision : null;
   let checkingForUpdates = false;
   const catalogueCacheKey = "ngqo-catalogue-cache-v1";
   let progressiveRenderTimer = null;
@@ -140,21 +147,10 @@
   }
 
   function makeProductCard(product) {
-    const card = element("article", "product-card");
+    const card = element("a", "product-card");
+    card.href = product.url || `/products/${encodeURIComponent(product.id)}/product/`;
     card.dataset.productId = String(product.id);
     card.dataset.productSignature = JSON.stringify(product);
-    card.tabIndex = 0;
-    card.setAttribute("role", "button");
-    card.setAttribute("aria-haspopup", "dialog");
-    card.setAttribute("aria-label", `View full details for ${product.name || "this product"}`);
-    card.addEventListener("click", () => openProductDetails(product));
-    card.addEventListener("keydown", (event) => {
-      if (event.target !== card) return;
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openProductDetails(product);
-      }
-    });
 
     const imageFrame = element("div", "product-image");
     const placeholder = element("span", "image-placeholder", "✳");
@@ -468,10 +464,11 @@
           throw new Error("The published catalogue is stale; loading the database API instead.");
         }
 
+        const unchanged = JSON.stringify(items) === JSON.stringify(products);
         products = items;
         if (typeof payload.revision === "string") catalogueVersion = payload.revision;
         saveCatalogueCache(items, payload.revision);
-        filterProducts();
+        if (!unchanged) filterProducts();
         refreshOpenProductDetails();
         return true;
       } catch (error) {
@@ -498,9 +495,10 @@
         throw new Error("The Django catalogue API response has an unexpected format.");
       }
 
+      const unchanged = JSON.stringify(items) === JSON.stringify(products);
       products = items;
       saveCatalogueCache(items);
-      filterProducts();
+      if (!unchanged) filterProducts();
       refreshOpenProductDetails();
       return true;
     } catch (error) {
@@ -543,15 +541,17 @@
   }
 
   async function startCatalogue() {
-    // Returning visitors see their last catalogue immediately while the
-    // network refresh runs in the background.
-    const restored = restoreCachedCatalogue();
+    // Every product is already present in the server-rendered HTML. Keep that
+    // complete grid visible while the published snapshot refreshes silently.
+    const hasServerCatalogue = Array.isArray(initialCatalogue?.products);
+    if (hasServerCatalogue) {
+      renderCategoryFilters();
+      status.textContent = `${products.length} product${products.length === 1 ? "" : "s"} in the catalogue.`;
+    } else {
+      restoreCachedCatalogue();
+    }
 
-    // First-time visitors fetch the published snapshot directly, without
-    // waiting for a separate database-version request.
-    const loaded = await loadProducts({ silent: restored });
-
-    // Verify freshness after the cached or network catalogue is visible.
+    const loaded = await loadProducts({ silent: products.length > 0 });
     if (loaded) checkForCatalogueUpdates();
   }
 
