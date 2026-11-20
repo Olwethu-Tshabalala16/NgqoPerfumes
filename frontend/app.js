@@ -7,6 +7,20 @@
   const productsEndpoint = `${apiBaseUrl}/api/products/`;
   const versionEndpoint = `${apiBaseUrl}/api/products/version/`;
   const catalogueJsonUrl = (config.CATALOGUE_JSON_URL || "").trim();
+
+  // Establish the Supabase connection before the first catalogue request.
+  if (catalogueJsonUrl) {
+    try {
+      const catalogueOrigin = new URL(catalogueJsonUrl, window.location.href).origin;
+      const preconnect = document.createElement("link");
+      preconnect.rel = "preconnect";
+      preconnect.href = catalogueOrigin;
+      preconnect.crossOrigin = "anonymous";
+      document.head.append(preconnect);
+    } catch {
+      // The normal catalogue request will report configuration errors.
+    }
+  }
   const refreshIntervalMs = 15000;
 
   const grid = document.querySelector("#product-grid");
@@ -26,6 +40,7 @@
   let catalogueVersion = null;
   let checkingForUpdates = false;
   const catalogueCacheKey = "ngqo-catalogue-cache-v1";
+  let progressiveRenderTimer = null;
 
   year.textContent = new Date().getFullYear();
 
@@ -240,7 +255,7 @@
     if (event.target === productDialog) productDialog.close();
   });
 
-  function renderProducts(items) {
+  function renderProducts(items, { preserveExisting = false } = {}) {
     if (!items.length) {
       const empty = element("div", "empty-state");
       empty.append(
@@ -290,7 +305,9 @@
       }
     });
 
-    existingCards.forEach((staleCard) => staleCard.remove());
+    if (!preserveExisting) {
+      existingCards.forEach((staleCard) => staleCard.remove());
+    }
   }
 
   const perfumeCategoryNames = new Set(["Arthur Ford", "Villa", "Fine Perfumes"]);
@@ -342,6 +359,48 @@
     categoryGrid.replaceChildren(...buttons);
   }
 
+  function renderProductsProgressively(items, sectionLabel, query) {
+    if (progressiveRenderTimer !== null) {
+      window.clearInterval(progressiveRenderTimer);
+      progressiveRenderTimer = null;
+    }
+
+    const batchSize = 8;
+    const total = items.length;
+    const updateStatus = (visible) => {
+      const qualifier = query ? "matching " : "";
+      status.textContent = visible < total
+        ? `Showing ${visible} of ${total} ${qualifier}products${sectionLabel}…`
+        : `${total} ${qualifier}product${total === 1 ? "" : "s"}${sectionLabel}.`;
+    };
+
+    // Clear the previous filter before showing the first batch.
+    grid.replaceChildren();
+    if (total <= batchSize) {
+      renderProducts(items);
+      updateStatus(total);
+      return;
+    }
+
+    let visible = batchSize;
+    renderProducts(items.slice(0, visible), { preserveExisting: true });
+    updateStatus(visible);
+
+    // Reveal another batch every 500 ms. One network response supplies the
+    // entire catalogue; these intervals only control progressive rendering.
+    progressiveRenderTimer = window.setInterval(() => {
+      visible = Math.min(visible + batchSize, total);
+      const complete = visible >= total;
+      renderProducts(items.slice(0, visible), { preserveExisting: !complete });
+      updateStatus(visible);
+
+      if (complete) {
+        window.clearInterval(progressiveRenderTimer);
+        progressiveRenderTimer = null;
+      }
+    }, 500);
+  }
+
   function filterProducts() {
     renderCategoryFilters();
     const isDeodorants = selectedCategory === "__deodorants__";
@@ -351,15 +410,10 @@
       ? searched
       : searched.filter((product) => String(product.category || "").trim() === selectedCategory);
 
-    renderProducts(filtered);
     const query = searchInput.value.trim();
     const section = catalogueSections.find((item) => item.key === selectedCategory);
     const sectionLabel = section ? ` in ${section.title}` : "";
-    if (query) {
-      status.textContent = `${filtered.length} matching product${filtered.length === 1 ? "" : "s"}${sectionLabel}.`;
-    } else {
-      status.textContent = `${filtered.length} product${filtered.length === 1 ? "" : "s"}${sectionLabel}.`;
-    }
+    renderProductsProgressively(filtered, sectionLabel, query);
   }
 
   async function fetchCatalogueVersion() {
