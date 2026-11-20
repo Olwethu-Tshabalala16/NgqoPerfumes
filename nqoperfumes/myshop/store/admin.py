@@ -17,6 +17,35 @@ class CategoryAdmin(admin.ModelAdmin):
     search_fields = ("name",)
     readonly_fields = ("created_at", "updated_at")
 
+    def _publish_catalogue(self, request):
+        try:
+            url = publish_catalogue()
+        except Exception:
+            logger.exception("Category saved, but publishing the Supabase JSON catalogue failed.")
+            self.message_user(
+                request,
+                "The category was saved, but the Supabase JSON catalogue could not be updated.",
+                level=messages.ERROR,
+            )
+        else:
+            self.message_user(
+                request,
+                f"Supabase product catalogue updated: {url}",
+                level=messages.SUCCESS,
+            )
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        self._publish_catalogue(request)
+
+    def delete_model(self, request, obj):
+        super().delete_model(request, obj)
+        self._publish_catalogue(request)
+
+    def delete_queryset(self, request, queryset):
+        super().delete_queryset(request, queryset)
+        self._publish_catalogue(request)
+
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
@@ -41,7 +70,8 @@ class ProductAdmin(admin.ModelAdmin):
 
     @require_POST
     def add_category_view(self, request):
-        if not self.has_add_permission(request):
+        category_admin = self.admin_site._registry[Category]
+        if not category_admin.has_add_permission(request):
             return JsonResponse({"error": "You do not have permission to add categories."}, status=403)
 
         name = request.POST.get("name", "").strip()
@@ -51,6 +81,11 @@ class ProductAdmin(admin.ModelAdmin):
             return JsonResponse({"error": "Category names must be 100 characters or fewer."}, status=400)
 
         category, created = Category.objects.get_or_create(name=name)
+        if created:
+            try:
+                publish_catalogue()
+            except Exception:
+                logger.exception("Category created, but the Supabase JSON catalogue could not be refreshed.")
         return JsonResponse(
             {"id": category.pk, "name": category.name, "created": created},
             status=201 if created else 200,
