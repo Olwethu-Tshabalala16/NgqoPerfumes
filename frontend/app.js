@@ -12,6 +12,7 @@
   const grid = document.querySelector("#product-grid");
   const status = document.querySelector("#catalogue-status");
   const searchInput = document.querySelector("#product-search");
+  const categoryGrid = document.querySelector("#category-grid");
   const year = document.querySelector("#current-year");
   const productDialog = document.querySelector("#product-dialog");
   const dialogImage = document.querySelector("#dialog-product-image");
@@ -21,6 +22,7 @@
   const dialogStock = document.querySelector("#dialog-product-stock");
   const dialogClose = document.querySelector("#dialog-close");
   let products = [];
+  let selectedCategory = "";
   let catalogueVersion = null;
   let checkingForUpdates = false;
 
@@ -141,6 +143,9 @@
     }
 
     const body = element("div", "product-body");
+    if (product.category) {
+      body.append(element("span", "product-category-label", product.category));
+    }
     const name = element("h3", "product-name", product.name || "Untitled product");
     const description = element(
       "p",
@@ -263,15 +268,67 @@
     existingCards.forEach((staleCard) => staleCard.remove());
   }
 
+  function renderCategoryFilters() {
+    if (!categoryGrid) return;
+    const counts = new Map();
+    products.forEach((product) => {
+      const category = String(product.category || "").trim();
+      if (category) counts.set(category, (counts.get(category) || 0) + 1);
+    });
+
+    const categories = [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
+    if (selectedCategory && !counts.has(selectedCategory)) selectedCategory = "";
+
+    const buttons = [];
+    const allButton = element("button", `category-card${selectedCategory ? "" : " is-active"}`);
+    allButton.type = "button";
+    allButton.setAttribute("aria-pressed", String(!selectedCategory));
+    allButton.append(
+      element("span", "category-card-kicker", "THE FULL COLLECTION"),
+      element("strong", "category-card-title", "All fragrances"),
+      element("span", "category-card-count", `${products.length} products`)
+    );
+    allButton.addEventListener("click", () => {
+      selectedCategory = "";
+      filterProducts();
+    });
+    buttons.push(allButton);
+
+    categories.forEach(([category, count]) => {
+      const button = element("button", `category-card${selectedCategory === category ? " is-active" : ""}`);
+      button.type = "button";
+      button.setAttribute("aria-pressed", String(selectedCategory === category));
+      button.append(
+        element("span", "category-card-kicker", "SHOP BY SECTION"),
+        element("strong", "category-card-title", category),
+        element("span", "category-card-count", `${count} product${count === 1 ? "" : "s"}`)
+      );
+      button.addEventListener("click", () => {
+        selectedCategory = category;
+        filterProducts();
+      });
+      buttons.push(button);
+    });
+
+    categoryGrid.replaceChildren(...buttons);
+  }
+
   function filterProducts() {
-    const filtered = catalogueUtils.filterProducts(products, searchInput.value);
+    renderCategoryFilters();
+    const searched = catalogueUtils.filterProducts(products, searchInput.value);
+    const filtered = selectedCategory
+      ? searched.filter((product) => String(product.category || "").trim() === selectedCategory)
+      : searched;
 
     renderProducts(filtered);
     const query = searchInput.value.trim();
+    const categoryLabel = selectedCategory ? ` in ${selectedCategory}` : "";
     if (query) {
-      status.textContent = `${filtered.length} matching product${filtered.length === 1 ? "" : "s"}.`;
+      status.textContent = `${filtered.length} matching product${filtered.length === 1 ? "" : "s"}${categoryLabel}.`;
+    } else if (selectedCategory) {
+      status.textContent = `${filtered.length} product${filtered.length === 1 ? "" : "s"} in ${selectedCategory}.`;
     } else {
-      status.textContent = `${products.length} product${products.length === 1 ? "" : "s"} in the collection.`
+      status.textContent = `${products.length} product${products.length === 1 ? "" : "s"} in the collection.`;
     }
   }
 
