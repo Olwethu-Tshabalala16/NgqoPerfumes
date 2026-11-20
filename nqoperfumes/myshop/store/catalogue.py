@@ -8,7 +8,7 @@ from django.core.files.base import ContentFile
 from django.db.models import Count, Max
 from django.utils import timezone
 
-from .models import Product
+from .models import Category, Product
 from .storage import SupabaseS3Storage
 
 CATALOGUE_OBJECT_KEY = "catalogue/products.json"
@@ -21,12 +21,21 @@ def get_catalogue_revision():
         latest_updated_at=Max("updated_at"),
         latest_id=Max("pk"),
     )
+    category_summary = Category.objects.aggregate(
+        count=Count("pk"),
+        latest_updated_at=Max("updated_at"),
+        latest_id=Max("pk"),
+    )
     latest_updated_at = summary["latest_updated_at"]
+    latest_category_updated_at = category_summary["latest_updated_at"]
     return ":".join(
         (
             str(summary["count"]),
             str(summary["latest_id"] or 0),
             latest_updated_at.isoformat() if latest_updated_at else "empty",
+            str(category_summary["count"]),
+            str(category_summary["latest_id"] or 0),
+            latest_category_updated_at.isoformat() if latest_category_updated_at else "empty",
         )
     )
 
@@ -44,6 +53,7 @@ def build_catalogue():
                 {
                     "id": product.pk,
                     "name": product.name,
+                    "category": product.category.name if product.category else None,
                     "description": product.description,
                     "price": str(product.price),
                     "stock": product.stock,
