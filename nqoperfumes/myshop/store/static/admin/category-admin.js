@@ -12,30 +12,38 @@
 
   if (!categorySelect || !guide || !dialog || !form) return;
 
-  const addButton = document.createElement("button");
-  addButton.type = "button";
-  addButton.className = "button nqo-add-category";
-  addButton.textContent = "+ Add Section";
-  addButton.setAttribute("aria-haspopup", "dialog");
-  categorySelect.insertAdjacentElement("afterend", addButton);
+  const addSectionValue = "__add_section__";
+  const addSectionOption = new Option("+ Add Section", addSectionValue);
+  categorySelect.add(addSectionOption);
+  let previousValue = categorySelect.value;
 
   function showError(message) {
     errorMessage.textContent = message;
     errorMessage.hidden = false;
   }
 
-  function closeDialog() {
+  function openDialog() {
+    dialog.showModal();
+    nameInput.focus();
+  }
+
+  function closeDialog(restoreSelection = false) {
+    if (restoreSelection) categorySelect.value = previousValue;
     dialog.close();
     form.reset();
     errorMessage.hidden = true;
     errorMessage.textContent = "";
   }
 
-  addButton.addEventListener("click", () => {
-    dialog.showModal();
-    nameInput.focus();
+  categorySelect.addEventListener("change", () => {
+    if (categorySelect.value === addSectionValue) {
+      openDialog();
+      return;
+    }
+    previousValue = categorySelect.value;
   });
-  cancelButton.addEventListener("click", closeDialog);
+
+  cancelButton.addEventListener("click", () => closeDialog(true));
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -73,9 +81,10 @@
       let option = [...categorySelect.options].find((item) => item.value === String(payload.id));
       if (!option) {
         option = new Option(payload.name, payload.id);
-        categorySelect.add(option);
+        categorySelect.insertBefore(option, addSectionOption);
       }
       categorySelect.value = String(payload.id);
+      previousValue = categorySelect.value;
       categorySelect.dispatchEvent(new Event("change", { bubbles: true }));
       closeDialog();
     } catch (error) {
