@@ -25,6 +25,7 @@
   let selectedCategory = "__all_perfumes__";
   let catalogueVersion = null;
   let checkingForUpdates = false;
+  const catalogueCacheKey = "ngqo-catalogue-cache-v1";
 
   year.textContent = new Date().getFullYear();
 
@@ -92,6 +93,30 @@
       // Very old browsers without either API: prefer a reliable eager load.
       image.loading = "eager";
       image.src = url;
+    }
+  }
+
+  function restoreCachedCatalogue() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(catalogueCacheKey) || "null");
+      if (!cached || !Array.isArray(cached.products)) return false;
+      products = cached.products;
+      if (typeof cached.revision === "string") catalogueVersion = cached.revision;
+      filterProducts();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function saveCatalogueCache(items, revision = null) {
+    try {
+      localStorage.setItem(catalogueCacheKey, JSON.stringify({
+        revision: typeof revision === "string" ? revision : null,
+        products: items
+      }));
+    } catch {
+      // Storage may be unavailable or full; network loading still works.
     }
   }
 
@@ -363,13 +388,17 @@
 
     // A published snapshot is safe to use only when its revision matches the
     // database revision endpoint. A mismatch means it is stale: use Django.
-    if (catalogueJsonUrl && expectedVersion !== null) {
+    if (catalogueJsonUrl) {
       try {
         const snapshotUrl = new URL(catalogueJsonUrl, window.location.href);
-        snapshotUrl.searchParams.set("v", String(Date.now()));
+        // First paint uses the browser's HTTP cache. Background refreshes use
+        // a revision query so they always retrieve the latest published file.
+        if (expectedVersion !== null) {
+          snapshotUrl.searchParams.set("v", String(Date.now()));
+        }
         const response = await fetch(snapshotUrl.toString(), {
           headers: { Accept: "application/json" },
-          cache: "no-store"
+          cache: expectedVersion === null ? "default" : "no-store"
         });
 
         if (!response.ok) {
@@ -381,11 +410,13 @@
         if (!items) {
           throw new Error("The published catalogue has an unexpected format.");
         }
-        if (payload.revision !== expectedVersion) {
+        if (expectedVersion !== null && payload.revision !== expectedVersion) {
           throw new Error("The published catalogue is stale; loading the database API instead.");
         }
 
         products = items;
+        if (typeof payload.revision === "string") catalogueVersion = payload.revision;
+        saveCatalogueCache(items, payload.revision);
         filterProducts();
         refreshOpenProductDetails();
         return true;
@@ -414,6 +445,7 @@
       }
 
       products = items;
+      saveCatalogueCache(items);
       filterProducts();
       refreshOpenProductDetails();
       return true;
@@ -457,17 +489,16 @@
   }
 
   async function startCatalogue() {
-    let expectedVersion = null;
-    try {
-      expectedVersion = await fetchCatalogueVersion();
-    } catch (error) {
-      console.warn("Initial catalogue revision check failed; using the Django API.", error);
-    }
+    // Returning visitors see their last catalogue immediately while the
+    // network refresh runs in the background.
+    const restored = restoreCachedCatalogue();
 
-    const loaded = await loadProducts({ expectedVersion });
-    if (loaded && expectedVersion !== null) {
-      catalogueVersion = expectedVersion;
-    }
+    // First-time visitors fetch the published snapshot directly, without
+    // waiting for a separate database-version request.
+    const loaded = await loadProducts({ silent: restored });
+
+    // Verify freshness after the cached or network catalogue is visible.
+    if (loaded) checkForCatalogueUpdates();
   }
 
   searchInput.addEventListener("input", filterProducts);

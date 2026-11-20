@@ -92,10 +92,10 @@ def publish_catalogue():
             "and SUPABASE_STORAGE_SECRET_ACCESS_KEY before publishing the catalogue."
         )
 
-    payload = json.dumps(build_catalogue(), ensure_ascii=False, indent=2).encode("utf-8")
+    payload = json.dumps(build_catalogue(), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     storage = SupabaseS3Storage(file_overwrite=True)
     storage.object_parameters = {
-        "CacheControl": "no-store, no-cache, max-age=0, must-revalidate",
+        "CacheControl": "public, max-age=30, s-maxage=60, stale-while-revalidate=120",
         "ContentType": "application/json",
     }
     storage.save(CATALOGUE_OBJECT_KEY, ContentFile(payload))
