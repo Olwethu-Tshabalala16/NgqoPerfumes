@@ -81,6 +81,7 @@ jobs:
           test -f staticfiles/admin/css/base.css
           test -f staticfiles/admin/nqo-admin.css
           test -f staticfiles/admin/password-toggle.js
+          test -f staticfiles/admin/category-admin.js
           test -f staticfiles/styles.css
           test -f staticfiles/app.js
           test -f staticfiles/config.js
@@ -96,6 +97,7 @@ jobs:
           node --check frontend/catalogue-utils.js
           node --check frontend/theme.js
           node --check nqoperfumes/myshop/store/static/admin/password-toggle.js
+          node --check nqoperfumes/myshop/store/static/admin/category-admin.js
           python -m py_compile manage.py vercel_wsgi.py scripts/build_vercel.py
           python -m py_compile nqoperfumes/myshop/myshop/wsgi.py nqoperfumes/myshop/store/middleware.py
 
