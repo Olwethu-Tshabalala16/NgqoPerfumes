@@ -363,13 +363,17 @@
 
     // A published snapshot is safe to use only when its revision matches the
     // database revision endpoint. A mismatch means it is stale: use Django.
-    if (catalogueJsonUrl && expectedVersion !== null) {
+    if (catalogueJsonUrl) {
       try {
         const snapshotUrl = new URL(catalogueJsonUrl, window.location.href);
-        snapshotUrl.searchParams.set("v", String(Date.now()));
+        // First paint uses the browser's HTTP cache. Background refreshes use
+        // a revision query so they always retrieve the latest published file.
+        if (expectedVersion !== null) {
+          snapshotUrl.searchParams.set("v", String(Date.now()));
+        }
         const response = await fetch(snapshotUrl.toString(), {
           headers: { Accept: "application/json" },
-          cache: "no-store"
+          cache: expectedVersion === null ? "default" : "no-store"
         });
 
         if (!response.ok) {
@@ -381,11 +385,12 @@
         if (!items) {
           throw new Error("The published catalogue has an unexpected format.");
         }
-        if (payload.revision !== expectedVersion) {
+        if (expectedVersion !== null && payload.revision !== expectedVersion) {
           throw new Error("The published catalogue is stale; loading the database API instead.");
         }
 
         products = items;
+        if (typeof payload.revision === "string") catalogueVersion = payload.revision;
         filterProducts();
         refreshOpenProductDetails();
         return true;
@@ -457,17 +462,13 @@
   }
 
   async function startCatalogue() {
-    let expectedVersion = null;
-    try {
-      expectedVersion = await fetchCatalogueVersion();
-    } catch (error) {
-      console.warn("Initial catalogue revision check failed; using the Django API.", error);
-    }
+    // Render the published snapshot immediately. Do not make visitors wait for
+    // a separate database-version request before the first product request.
+    const loaded = await loadProducts();
 
-    const loaded = await loadProducts({ expectedVersion });
-    if (loaded && expectedVersion !== null) {
-      catalogueVersion = expectedVersion;
-    }
+    // Verify freshness only after products are already on screen. If an admin
+    // has just changed the catalogue, the normal update path refreshes it.
+    if (loaded) checkForCatalogueUpdates();
   }
 
   searchInput.addEventListener("input", filterProducts);
