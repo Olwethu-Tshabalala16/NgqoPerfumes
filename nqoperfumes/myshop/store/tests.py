@@ -322,7 +322,7 @@ class AdminDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="id_category"')
-        self.assertRegex(response.content.decode(), r"/static/admin/category-admin\\.[a-f0-9]+\\.js")
+        self.assertRegex(response.content.decode(), r"/static/admin/category-admin\.[a-f0-9]+\.js")
         self.assertContains(response, 'id="nqo-category-dialog"')
         self.assertContains(response, 'data-add-category-url="/admin/store/product/add-category/"')
 
