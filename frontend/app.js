@@ -25,6 +25,7 @@
   let selectedCategory = "__all_perfumes__";
   let catalogueVersion = null;
   let checkingForUpdates = false;
+  const catalogueCacheKey = "ngqo-catalogue-cache-v1";
 
   year.textContent = new Date().getFullYear();
 
@@ -92,6 +93,30 @@
       // Very old browsers without either API: prefer a reliable eager load.
       image.loading = "eager";
       image.src = url;
+    }
+  }
+
+  function restoreCachedCatalogue() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(catalogueCacheKey) || "null");
+      if (!cached || !Array.isArray(cached.products)) return false;
+      products = cached.products;
+      if (typeof cached.revision === "string") catalogueVersion = cached.revision;
+      filterProducts();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function saveCatalogueCache(items, revision = null) {
+    try {
+      localStorage.setItem(catalogueCacheKey, JSON.stringify({
+        revision: typeof revision === "string" ? revision : null,
+        products: items
+      }));
+    } catch {
+      // Storage may be unavailable or full; network loading still works.
     }
   }
 
@@ -391,6 +416,7 @@
 
         products = items;
         if (typeof payload.revision === "string") catalogueVersion = payload.revision;
+        saveCatalogueCache(items, payload.revision);
         filterProducts();
         refreshOpenProductDetails();
         return true;
@@ -419,6 +445,7 @@
       }
 
       products = items;
+      saveCatalogueCache(items);
       filterProducts();
       refreshOpenProductDetails();
       return true;
@@ -462,12 +489,15 @@
   }
 
   async function startCatalogue() {
-    // Render the published snapshot immediately. Do not make visitors wait for
-    // a separate database-version request before the first product request.
-    const loaded = await loadProducts();
+    // Returning visitors see their last catalogue immediately while the
+    // network refresh runs in the background.
+    const restored = restoreCachedCatalogue();
 
-    // Verify freshness only after products are already on screen. If an admin
-    // has just changed the catalogue, the normal update path refreshes it.
+    // First-time visitors fetch the published snapshot directly, without
+    // waiting for a separate database-version request.
+    const loaded = await loadProducts({ silent: restored });
+
+    // Verify freshness after the cached or network catalogue is visible.
     if (loaded) checkForCatalogueUpdates();
   }
 
