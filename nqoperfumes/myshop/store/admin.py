@@ -1,19 +1,64 @@
 import logging
 
 from django.contrib import admin, messages
+from django.http import JsonResponse
+from django.urls import path, reverse
+from django.views.decorators.http import require_POST
 
 from .catalogue import publish_catalogue
-from .models import Product
+from .models import Category, Product
 
 logger = logging.getLogger(__name__)
 
 
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "created_at", "updated_at")
+    search_fields = ("name",)
+    readonly_fields = ("created_at", "updated_at")
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("name", "price", "stock", "is_in_stock", "created_at")
-    list_filter = ("stock", "created_at")
-    search_fields = ("name", "description")
+    change_form_template = "admin/store/product/change_form.html"
+    list_display = ("name", "category", "price", "stock", "is_in_stock", "created_at")
+    list_filter = ("category", "stock", "created_at")
+    search_fields = ("name", "description", "category__name")
     readonly_fields = ("created_at", "updated_at")
+
+    class Media:
+        js = ("admin/category-admin.js",)
+
+    def get_urls(self):
+        custom_urls = [
+            path(
+                "add-category/",
+                self.admin_site.admin_view(self.add_category_view),
+                name="store_product_add_category",
+            ),
+        ]
+        return custom_urls + super().get_urls()
+
+    @require_POST
+    def add_category_view(self, request):
+        if not self.has_add_permission(request):
+            return JsonResponse({"error": "You do not have permission to add categories."}, status=403)
+
+        name = request.POST.get("name", "").strip()
+        if not name:
+            return JsonResponse({"error": "Enter a category name."}, status=400)
+        if len(name) > 100:
+            return JsonResponse({"error": "Category names must be 100 characters or fewer."}, status=400)
+
+        category, created = Category.objects.get_or_create(name=name)
+        return JsonResponse(
+            {"id": category.pk, "name": category.name, "created": created},
+            status=201 if created else 200,
+        )
+
+    def render_change_form(self, request, context, *args, **kwargs):
+        context["add_category_url"] = reverse("admin:store_product_add_category")
+        return super().render_change_form(request, context, *args, **kwargs)
 
     def _publish_catalogue(self, request):
         try:
