@@ -1,6 +1,19 @@
 {% extends "admin/change_form.html" %}
 {% block form_top %}
-<section class="nqo-product-guide" aria-labelledby="nqo-product-guide-title">
-<div class="nqo-guide-icon" aria-hidden="true">N</div><div class="nqo-guide-copy"><h2 id="nqo-product-guide-title">Add a product</h2><p>Enter the product details, choose a clear image, then save. These details will appear in the Ngqo Enterprises catalogue.</p><div class="nqo-guide-steps" aria-label="Product entry steps"><span><strong>1</strong> Product name</span><span><strong>2</strong> Description</span><span><strong>3</strong> Price &amp; stock</span><span><strong>4</strong> Product image</span></div></div>
+<section class="nqo-product-guide" aria-labelledby="nqo-product-guide-title" data-add-category-url="{{ add_category_url }}">
+<div class="nqo-guide-icon" aria-hidden="true">N</div><div class="nqo-guide-copy"><h2 id="nqo-product-guide-title">Add a product</h2><p>Enter the product details, choose a category, select a clear image, then save. These details will appear in the Ngqo Enterprises catalogue.</p><div class="nqo-guide-steps" aria-label="Product entry steps"><span><strong>1</strong> Product name</span><span><strong>2</strong> Category</span><span><strong>3</strong> Price &amp; stock</span><span><strong>4</strong> Product image</span></div></div>
 </section>
+<dialog id="nqo-category-dialog" class="nqo-category-dialog" aria-labelledby="nqo-category-dialog-title">
+  <form id="nqo-category-form" method="dialog">
+    <h2 id="nqo-category-dialog-title">Add a category</h2>
+    <p>Create a section such as Fine Perfumes, Villa or Arthur Ford. It will be available in the product category dropdown.</p>
+    <label for="nqo-category-name">Category name</label>
+    <input id="nqo-category-name" name="name" type="text" maxlength="100" required autocomplete="off">
+    <p id="nqo-category-error" class="nqo-category-error" role="alert" hidden></p>
+    <div class="nqo-category-actions">
+      <button type="button" class="button" id="nqo-category-cancel">Cancel</button>
+      <button type="submit" class="button default" id="nqo-category-save">Add category</button>
+    </div>
+  </form>
+</dialog>
 {% endblock %}
