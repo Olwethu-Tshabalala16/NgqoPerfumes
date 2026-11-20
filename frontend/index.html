@@ -73,8 +73,33 @@
         </div>
         <div id="category-grid" class="category-grid" aria-label="Product categories"></div>
       </div>
-      <p id="catalogue-status" class="catalogue-status" role="status" aria-live="polite">Loading products…</p>
-      <div id="product-grid" class="product-grid" aria-live="polite"></div>
+      <p id="catalogue-status" class="catalogue-status" role="status" aria-live="polite">{{ products|length }} product{{ products|length|pluralize }} in the catalogue.</p>
+      <div id="product-grid" class="product-grid" aria-live="polite">
+        {% for product in products %}
+          <a class="product-card" data-product-id="{{ product.pk }}" href="{% url 'product_detail' product.pk product.name|slugify %}">
+            <div class="product-image">
+              {% if product.image %}
+                <img class="product-photo" src="{{ product.image.url }}" alt="{{ product.name }} product" loading="{% if forloop.first %}eager{% else %}lazy{% endif %}" decoding="async"{% if forloop.first %} fetchpriority="high"{% endif %}>
+              {% else %}
+                <span class="image-placeholder" aria-hidden="true">✳</span>
+              {% endif %}
+            </div>
+            <div class="product-body">
+              {% if product.category %}<span class="product-category-label">{{ product.category.name }}</span>{% endif %}
+              <h3 class="product-name">{{ product.name }}</h3>
+              <p class="product-description">{{ product.description|default:"Contact us for more information about this product."|truncatechars:150 }}</p>
+              <span class="product-details-hint">View product details ↗</span>
+              <div class="product-card-footer">
+                <p class="product-price">R {{ product.price }}</p>
+                <span class="stock-status {% if product.stock %}in-stock{% else %}out-of-stock{% endif %}">{% if product.stock %}In stock · {{ product.stock }}{% else %}Out of stock{% endif %}</span>
+              </div>
+            </div>
+          </a>
+        {% empty %}
+          <div class="empty-state"><span class="empty-symbol" aria-hidden="true">✳</span><h3>The product collection is being prepared</h3><p>Please check back soon for the latest collection.</p></div>
+        {% endfor %}
+      </div>
+      {{ initial_catalogue|json_script:"initial-catalogue-data" }}
     </section>
   </main>
 
