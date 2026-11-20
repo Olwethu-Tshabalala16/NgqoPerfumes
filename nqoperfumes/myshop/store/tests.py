@@ -314,6 +314,7 @@ class AdminDashboardTests(TestCase):
             email="admin@example.com",
             password="test-only-password-123",
         )
+        self.client.defaults["REMOTE_ADDR"] = "192.0.2.10"
         self.client.force_login(self.admin_user)
 
     def test_product_admin_form_renders_category_dropdown_and_quick_add_control(self):
@@ -321,7 +322,7 @@ class AdminDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="id_category"')
-        self.assertContains(response, "admin/category-admin.js")
+        self.assertRegex(response.content.decode(), r"/static/admin/category-admin\\.[a-f0-9]+\\.js")
         self.assertContains(response, 'id="nqo-category-dialog"')
         self.assertContains(response, 'data-add-category-url="/admin/store/product/add-category/"')
 
@@ -332,11 +333,12 @@ class AdminDashboardTests(TestCase):
         self.assertEqual(response["Allow"], "POST")
 
     def test_product_form_can_create_category_without_leaving_the_form(self):
-        response = self.client.post(
-            reverse("admin:store_product_add_category"),
-            {"name": "Villa"},
-            HTTP_ACCEPT="application/json",
-        )
+        with patch("store.admin.publish_catalogue", return_value="https://example.test/catalogue.json"):
+            response = self.client.post(
+                reverse("admin:store_product_add_category"),
+                {"name": "Villa"},
+                HTTP_ACCEPT="application/json",
+            )
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["name"], "Villa")
@@ -345,11 +347,12 @@ class AdminDashboardTests(TestCase):
 
     def test_product_form_category_endpoint_reuses_existing_category(self):
         existing = Category.objects.create(name="Fine Perfumes")
-        response = self.client.post(
-            reverse("admin:store_product_add_category"),
-            {"name": "Fine Perfumes"},
-            HTTP_ACCEPT="application/json",
-        )
+        with patch("store.admin.publish_catalogue", return_value="https://example.test/catalogue.json"):
+            response = self.client.post(
+                reverse("admin:store_product_add_category"),
+                {"name": "Fine Perfumes"},
+                HTTP_ACCEPT="application/json",
+            )
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["created"])
