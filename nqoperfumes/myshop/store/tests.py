@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.urls import reverse
 
-from .models import Product
+from .models import Category, Product
 
 
 class ProductApiTests(TestCase):
@@ -33,6 +33,7 @@ class ProductApiTests(TestCase):
             {
                 "id": self.product.pk,
                 "name": "Amber Oud",
+                "category": None,
                 "description": "A warm woody fragrance.",
                 "price": "249.99",
                 "stock": 4,
@@ -40,6 +41,19 @@ class ProductApiTests(TestCase):
                 "image_url": None,
             },
         )
+
+    def test_product_category_is_returned_by_api_and_published_json(self):
+        from .catalogue import build_catalogue
+
+        category = Category.objects.create(name="Arthur Ford")
+        self.product.category = category
+        self.product.save(update_fields=("category", "updated_at"))
+
+        api_product = self.client.get(reverse("store:product_list_api")).json()["results"][0]
+        self.assertEqual(api_product["category"], "Arthur Ford")
+
+        published_product = build_catalogue()["products"][0]
+        self.assertEqual(published_product["category"], "Arthur Ford")
 
     def test_catalogue_version_changes_when_products_change(self):
         url = reverse("store:product_catalogue_version_api")
@@ -107,6 +121,7 @@ class CataloguePublishingTests(TestCase):
             {
                 "id": self.product.pk,
                 "name": "Amber Oud",
+                "category": None,
                 "description": "A warm woody fragrance.",
                 "price": "249.99",
                 "stock": 4,
@@ -283,6 +298,30 @@ class AdminDashboardTests(TestCase):
             password="test-only-password-123",
         )
         self.client.force_login(self.admin_user)
+
+    def test_product_form_can_create_category_without_leaving_the_form(self):
+        response = self.client.post(
+            reverse("admin:store_product_add_category"),
+            {"name": "Villa"},
+            HTTP_ACCEPT="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["name"], "Villa")
+        self.assertTrue(response.json()["created"])
+        self.assertTrue(Category.objects.filter(name="Villa").exists())
+
+    def test_product_form_category_endpoint_reuses_existing_category(self):
+        existing = Category.objects.create(name="Fine Perfumes")
+        response = self.client.post(
+            reverse("admin:store_product_add_category"),
+            {"name": "Fine Perfumes"},
+            HTTP_ACCEPT="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["created"])
+        self.assertEqual(response.json()["id"], existing.pk)
 
     def test_admin_dashboard_renders(self):
         response = self.client.get(reverse("admin:index"))
