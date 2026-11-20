@@ -20,6 +20,7 @@ def product_list_api(request):
             {
                 "id": product.pk,
                 "name": product.name,
+                "category": product.category.name if product.category else None,
                 "description": product.description,
                 "price": str(product.price),
                 "stock": product.stock,
