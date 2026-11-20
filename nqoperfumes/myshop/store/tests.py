@@ -321,7 +321,7 @@ class AdminDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="id_category"')
-        self.assertContains(response, "+ Add Section")
+        self.assertContains(response, "admin/category-admin.js")
         self.assertContains(response, 'id="nqo-category-dialog"')
         self.assertContains(response, 'data-add-category-url="/admin/store/product/add-category/"')
 
