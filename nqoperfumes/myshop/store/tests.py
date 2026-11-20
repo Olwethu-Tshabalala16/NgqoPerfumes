@@ -81,6 +81,23 @@ class ProductApiTests(TestCase):
         deleted_version = self.client.get(url).json()["version"]
         self.assertNotEqual(updated_version, deleted_version)
 
+    def test_catalogue_version_changes_when_category_changes(self):
+        url = reverse("store:product_catalogue_version_api")
+        first_version = self.client.get(url).json()["version"]
+
+        category = Category.objects.create(name="Villa")
+        created_version = self.client.get(url).json()["version"]
+        self.assertNotEqual(first_version, created_version)
+
+        category.name = "Villa Collection"
+        category.save()
+        renamed_version = self.client.get(url).json()["version"]
+        self.assertNotEqual(created_version, renamed_version)
+
+        category.delete()
+        deleted_version = self.client.get(url).json()["version"]
+        self.assertNotEqual(renamed_version, deleted_version)
+
     def test_product_list_is_read_only(self):
         response = self.client.post(reverse("store:product_list_api"), data={})
         self.assertEqual(response.status_code, 405)
