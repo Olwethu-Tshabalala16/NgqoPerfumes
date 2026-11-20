@@ -2,6 +2,8 @@
 
 import json
 
+from django.utils.text import slugify
+
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.base import ContentFile
@@ -44,7 +46,7 @@ def build_catalogue():
     """Build a snapshot whose revision matches the products included in it."""
     for _attempt in range(3):
         revision_before = get_catalogue_revision()
-        products = list(Product.objects.all().order_by("-created_at", "-pk"))
+        products = list(Product.objects.select_related("category").all().order_by("-created_at", "-pk"))
         results = []
 
         for product in products:
@@ -59,6 +61,7 @@ def build_catalogue():
                     "stock": product.stock,
                     "is_in_stock": product.is_in_stock(),
                     "image_url": image_url,
+                    "url": f"/products/{product.pk}/{slugify(product.name) or 'product'}/",
                     "created_at": product.created_at.isoformat() if product.created_at else None,
                     "updated_at": product.updated_at.isoformat() if product.updated_at else None,
                 }
