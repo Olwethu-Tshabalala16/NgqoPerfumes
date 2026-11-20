@@ -3,7 +3,6 @@ import logging
 from django.contrib import admin, messages
 from django.http import JsonResponse
 from django.urls import path, reverse
-from django.views.decorators.http import require_POST
 
 from .catalogue import publish_catalogue
 from .models import Category, Product
@@ -68,8 +67,12 @@ class ProductAdmin(admin.ModelAdmin):
         ]
         return custom_urls + super().get_urls()
 
-    @require_POST
     def add_category_view(self, request):
+        if request.method != "POST":
+            response = JsonResponse({"error": "Only POST requests are allowed."}, status=405)
+            response["Allow"] = "POST"
+            return response
+
         category_admin = self.admin_site._registry[Category]
         if not category_admin.has_add_permission(request):
             return JsonResponse({"error": "You do not have permission to add categories."}, status=403)
