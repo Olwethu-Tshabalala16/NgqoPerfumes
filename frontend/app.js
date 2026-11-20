@@ -269,26 +269,35 @@
   }
 
   const perfumeCategoryNames = new Set(["Arthur Ford", "Villa", "Fine Perfumes"]);
-  const perfumeSections = [
+  const deodorantCategoryNames = new Set(["Men's Deodorants", "Women's Deodorants"]);
+  const catalogueSections = [
     { key: "__all_perfumes__", title: "All Perfumes", kicker: "THE FULL PERFUME COLLECTION" },
     { key: "Arthur Ford", title: "Arthur Ford", kicker: "SHOP BY BRAND" },
     { key: "Villa", title: "Villa", kicker: "SHOP BY BRAND" },
-    { key: "Fine Perfumes", title: "Fine Perfumes", kicker: "SHOP BY SECTION" }
+    { key: "Fine Perfumes", title: "Fine Perfumes", kicker: "SHOP BY SECTION" },
+    { key: "__deodorants__", title: "Deodorants", kicker: "MEN'S & WOMEN'S DEODORANTS" }
   ];
 
   function getPerfumeProducts() {
     return products.filter((product) => perfumeCategoryNames.has(String(product.category || "").trim()));
   }
 
+  function getDeodorantProducts() {
+    return products.filter((product) => deodorantCategoryNames.has(String(product.category || "").trim()));
+  }
+
   function renderCategoryFilters() {
     if (!categoryGrid) return;
     const perfumeProducts = getPerfumeProducts();
+    const deodorantProducts = getDeodorantProducts();
     const buttons = [];
 
-    perfumeSections.forEach((section) => {
+    catalogueSections.forEach((section) => {
       const count = section.key === "__all_perfumes__"
         ? perfumeProducts.length
-        : perfumeProducts.filter((product) => String(product.category || "").trim() === section.key).length;
+        : section.key === "__deodorants__"
+          ? deodorantProducts.length
+          : perfumeProducts.filter((product) => String(product.category || "").trim() === section.key).length;
       const active = selectedCategory === section.key;
       const button = element("button", `category-card${active ? " is-active" : ""}`);
       button.type = "button";
@@ -310,18 +319,21 @@
 
   function filterProducts() {
     renderCategoryFilters();
-    const searched = catalogueUtils.filterProducts(getPerfumeProducts(), searchInput.value);
-    const filtered = selectedCategory === "__all_perfumes__"
+    const isDeodorants = selectedCategory === "__deodorants__";
+    const selectedProducts = isDeodorants ? getDeodorantProducts() : getPerfumeProducts();
+    const searched = catalogueUtils.filterProducts(selectedProducts, searchInput.value);
+    const filtered = selectedCategory === "__all_perfumes__" || isDeodorants
       ? searched
       : searched.filter((product) => String(product.category || "").trim() === selectedCategory);
 
     renderProducts(filtered);
     const query = searchInput.value.trim();
-    const categoryLabel = selectedCategory === "__all_perfumes__" ? " in All Perfumes" : ` in ${selectedCategory}`;
+    const section = catalogueSections.find((item) => item.key === selectedCategory);
+    const sectionLabel = section ? ` in ${section.title}` : "";
     if (query) {
-      status.textContent = `${filtered.length} matching product${filtered.length === 1 ? "" : "s"}${categoryLabel}.`;
+      status.textContent = `${filtered.length} matching product${filtered.length === 1 ? "" : "s"}${sectionLabel}.`;
     } else {
-      status.textContent = `${filtered.length} product${filtered.length === 1 ? "" : "s"}${categoryLabel}.`;
+      status.textContent = `${filtered.length} product${filtered.length === 1 ? "" : "s"}${sectionLabel}.`;
     }
   }
 
