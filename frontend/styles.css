@@ -409,3 +409,21 @@ button, input { font: inherit; }
   align-items: center;
   gap: .4rem;
 }
+
+
+/* Category browsing cards and product category labels. */
+.category-section { margin: 0 0 2.25rem; }
+.category-section-heading { margin-bottom: 1rem; }
+.category-section-heading .eyebrow { margin-bottom: .35rem; }
+.category-section-heading h3 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.35rem, 2.5vw, 1.8rem); font-weight: 500; }
+.category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .85rem; }
+.category-card { display: flex; min-height: 142px; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: .65rem; padding: 1.15rem; border: 1px solid var(--line); border-radius: 12px; background: var(--white); color: var(--ink); text-align: left; cursor: pointer; transition: border-color .18s ease, transform .18s ease, background .18s ease; }
+.category-card:hover { transform: translateY(-2px); border-color: var(--gold); }
+.category-card.is-active { border-color: var(--gold); background: var(--cream-deep); box-shadow: inset 0 0 0 1px var(--gold); }
+.category-card-kicker { color: var(--muted); font-size: .65rem; letter-spacing: .13em; }
+.category-card-title { font-family: Georgia, "Times New Roman", serif; font-size: 1.25rem; font-weight: 500; overflow-wrap: anywhere; }
+.category-card-count { color: var(--muted); font-size: .78rem; }
+.product-category-label { display: inline-flex; width: fit-content; margin-bottom: .55rem; padding: .25rem .55rem; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: .68rem; letter-spacing: .04em; }
+html[data-theme="dark"] .category-card { background: #211F1C; color: var(--ink); border-color: var(--line); }
+html[data-theme="dark"] .category-card.is-active { background: #30291F; border-color: var(--gold); }
+@media (max-width: 520px) { .category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; } .category-card { min-height: 120px; padding: .85rem; } .category-card-title { font-size: 1.05rem; } }
