@@ -15,7 +15,7 @@
     const normalizedQuery = String(query ?? "").trim().toLocaleLowerCase();
 
     return products.filter((product) => {
-      const searchable = `${product.name || ""} ${product.description || ""}`.toLocaleLowerCase();
+      const searchable = `${product.name || ""} ${product.category || ""} ${product.description || ""}`.toLocaleLowerCase();
       return searchable.includes(normalizedQuery);
     });
   }
