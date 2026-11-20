@@ -51,3 +51,13 @@ test("hasProductImage rejects missing and blank image URLs", () => {
 test("hasProductImage accepts a valid image URL", () => {
   assert.equal(hasProductImage({ image_url: "https://cdn.example.test/amber.jpg" }), true);
 });
+
+
+test("product search matches the category name", () => {
+  const products = [
+    { name: "Amber Oud", description: "Warm fragrance", category: "Arthur Ford" },
+    { name: "Rose Musk", description: "Floral fragrance", category: "Villa" }
+  ];
+
+  assert.deepEqual(filterProducts(products, "arthur ford"), [products[0]]);
+});
