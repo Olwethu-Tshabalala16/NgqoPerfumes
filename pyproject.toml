@@ -20,7 +20,7 @@ dependencies = [
     "pillow==13.0.0",
     "psycopg2-binary==2.9.12",
     "python-dotenv==1.2.4",
-    "PyOTP==2.10.0",
+    "PyOTP==2.12.1",
     "qrcode==8.2",
     "requests==2.34.2",
     "six==1.17.0",
